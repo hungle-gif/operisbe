@@ -3,12 +3,21 @@ Proposal API endpoints
 Sale creates and sends proposals to customers for negotiation
 """
 from typing import List
+from decimal import Decimal
 from ninja import Router
 from ninja.errors import HttpError
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from api.dependencies.current_user import auth_bearer, require_roles
-from apps.projects.models import Proposal, ProposalStatus, Project, ProjectStatus
+from apps.projects.models import (
+    Proposal,
+    ProposalStatus,
+    Project,
+    ProjectStatus,
+    Transaction,
+    TransactionType,
+    TransactionStatus,
+)
 from apps.projects.schemas.proposal_schema import (
     ProposalCreate,
     ProposalUpdate,
@@ -77,6 +86,92 @@ def serialize_proposal(proposal):
         'created_at': proposal.created_at.isoformat(),
         'updated_at': proposal.updated_at.isoformat()
     }
+
+
+def record_payment_transaction(
+    *,
+    project,
+    proposal,
+    transaction_type,
+    amount,
+    phase_index=None,
+    phase_name=None,
+    description=None,
+    payment_method="bank_transfer",
+    transaction_reference=None,
+    metadata=None,
+):
+    """
+    Ensure we always have a transaction record when money moves.
+    This keeps the admin transaction table in sync with deposit/phase approvals.
+    """
+    if not project.customer or not project.customer.user:
+        return None
+
+    completed_at = timezone.now()
+    metadata = metadata or {}
+
+    existing = Transaction.objects.filter(
+        project=project,
+        proposal=proposal,
+        transaction_type=transaction_type,
+        phase_index=phase_index,
+    ).order_by('-created_at').first()
+
+    if existing:
+        fields_to_update = set()
+
+        if existing.amount != amount:
+            existing.amount = amount
+            fields_to_update.add('amount')
+
+        if existing.status != TransactionStatus.COMPLETED:
+            existing.status = TransactionStatus.COMPLETED
+            fields_to_update.add('status')
+
+        if existing.phase_name != phase_name:
+            existing.phase_name = phase_name
+            fields_to_update.add('phase_name')
+
+        if existing.payment_method != payment_method:
+            existing.payment_method = payment_method
+            fields_to_update.add('payment_method')
+
+        if existing.transaction_reference != transaction_reference:
+            existing.transaction_reference = transaction_reference
+            fields_to_update.add('transaction_reference')
+
+        if description is not None and existing.description != description:
+            existing.description = description
+            fields_to_update.add('description')
+
+        if metadata:
+            merged_metadata = {**(existing.metadata or {}), **metadata}
+            if merged_metadata != existing.metadata:
+                existing.metadata = merged_metadata
+                fields_to_update.add('metadata')
+
+        if fields_to_update:
+            existing.completed_at = completed_at
+            fields_to_update.add('completed_at')
+            existing.save(update_fields=[*fields_to_update, 'updated_at'])
+        return existing
+
+    return Transaction.objects.create(
+        project=project,
+        proposal=proposal,
+        customer=project.customer.user,
+        transaction_type=transaction_type,
+        status=TransactionStatus.COMPLETED,
+        amount=amount,
+        phase_index=phase_index,
+        phase_name=phase_name,
+        payment_method=payment_method,
+        transaction_reference=transaction_reference,
+        description=description,
+        completed_at=completed_at,
+        metadata=metadata,
+    )
 
 
 @router.post("/projects/{project_id}/proposals", response=ProposalOut, auth=auth_bearer)
@@ -419,6 +514,22 @@ def submit_payment(request, proposal_id: str):
 
     proposal.save()
 
+    payment_proof = proposal.payment_proof or {}
+    deposit_amount = Decimal(str(proposal.deposit_amount or 0))
+    record_payment_transaction(
+        project=proposal.project,
+        proposal=proposal,
+        transaction_type=TransactionType.DEPOSIT,
+        amount=deposit_amount,
+        description="Deposit payment auto-approved by customer",
+        payment_method=payment_proof.get('method', 'bank_transfer'),
+        transaction_reference=payment_proof.get('reference'),
+        metadata={
+            'source': 'auto_deposit_submit',
+            'payment_proof': payment_proof,
+        },
+    )
+
     # Start the project IMMEDIATELY
     proposal.project.status = ProjectStatus.IN_PROGRESS
     proposal.project.start_date = now.date()
@@ -462,6 +573,20 @@ def confirm_deposit_payment(request, proposal_id: str):
     proposal.deposit_paid_at = timezone.now()
     proposal.deposit_approved_by = user
     proposal.save()
+
+    deposit_amount = Decimal(str(proposal.deposit_amount or 0))
+    record_payment_transaction(
+        project=proposal.project,
+        proposal=proposal,
+        transaction_type=TransactionType.DEPOSIT,
+        amount=deposit_amount,
+        description=f"Deposit payment confirmed by {user.full_name}",
+        payment_method='manual_confirmation',
+        metadata={
+            'source': 'admin_confirm_deposit',
+            'confirmed_by': str(user.id),
+        },
+    )
 
     # Change project status to IN_PROGRESS (start project)
     proposal.project.status = ProjectStatus.IN_PROGRESS
@@ -588,6 +713,24 @@ def submit_phase_payment(request, proposal_id: str, phase_index: int):
 
     proposal.phases = phases
     proposal.save()
+
+    phase_payment_proof = phase.get('payment_proof') or {}
+    phase_amount = Decimal(str(phase.get('amount') or 0))
+    record_payment_transaction(
+        project=proposal.project,
+        proposal=proposal,
+        transaction_type=TransactionType.PHASE,
+        amount=phase_amount,
+        phase_index=phase_index,
+        phase_name=phase.get('name'),
+        description=f"Phase {phase_index + 1} payment auto-approved by customer",
+        payment_method=phase_payment_proof.get('method', 'bank_transfer'),
+        transaction_reference=phase_payment_proof.get('reference'),
+        metadata={
+            'source': 'auto_phase_submit',
+            'phase_payment_proof': phase_payment_proof,
+        },
+    )
 
     # Check if this was the last phase - if so, mark project as COMPLETED
     all_phases_paid = all(p.get('payment_approved', False) for p in phases)

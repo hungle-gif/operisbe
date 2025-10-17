@@ -43,7 +43,7 @@ interface Project {
   id: string
   name: string
   status: string
-  budget: number
+  budget: number | null
   created_at: string
 }
 
@@ -86,11 +86,12 @@ export default function AdminReportsPage() {
     }
   }
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number | null | undefined) => {
+    const safeAmount = typeof amount === 'number' && Number.isFinite(amount) ? amount : 0
     return new Intl.NumberFormat('vi-VN', {
       style: 'currency',
       currency: 'VND'
-    }).format(amount)
+    }).format(safeAmount)
   }
 
   const formatPercent = (value: number) => {
