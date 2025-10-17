@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import ProjectDetailModal from '@/components/admin/ProjectDetailModal'
 
 interface Project {
   id: string
@@ -28,6 +29,8 @@ export default function AdminProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<string>('')
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
 
   useEffect(() => {
     loadProjects()
@@ -79,6 +82,16 @@ export default function AdminProjectsPage() {
       console.error('Failed to delete project:', err)
       alert('❌ Lỗi kết nối server')
     }
+  }
+
+  const openProjectDetail = (projectId: string) => {
+    setSelectedProjectId(projectId)
+    setIsModalOpen(true)
+  }
+
+  const closeModal = () => {
+    setIsModalOpen(false)
+    setSelectedProjectId(null)
   }
 
   const getStatusBadge = (status: string) => {
@@ -192,7 +205,7 @@ export default function AdminProjectsPage() {
                     <tr key={project.id} className="border-b hover:bg-gray-50">
                       <td className="py-4 px-4">
                         <button
-                          onClick={() => router.push(`/dashboard/admin/projects/${project.id}`)}
+                          onClick={() => openProjectDetail(project.id)}
                           className="text-blue-600 hover:underline font-medium"
                         >
                           {project.name}
@@ -222,20 +235,20 @@ export default function AdminProjectsPage() {
                       <td className="py-4 px-4">
                         <div className="flex items-center justify-center gap-2">
                           <button
-                            onClick={() => router.push(`/dashboard/admin/projects/${project.id}`)}
-                            className="px-3 py-1 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700"
+                            onClick={() => openProjectDetail(project.id)}
+                            className="px-3 py-1 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
                           >
                             Chi Tiết
                           </button>
                           <button
                             onClick={() => router.push(`/dashboard/admin/projects/${project.id}/finance`)}
-                            className="px-3 py-1 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700"
+                            className="px-3 py-1 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors"
                           >
                             Tài Chính
                           </button>
                           <button
                             onClick={() => handleDeleteProject(project.id, project.name)}
-                            className="px-3 py-1 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700"
+                            className="px-3 py-1 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors"
                           >
                             Xóa
                           </button>
@@ -283,6 +296,15 @@ export default function AdminProjectsPage() {
           </div>
         </div>
       </div>
+
+      {/* Project Detail Modal */}
+      {selectedProjectId && (
+        <ProjectDetailModal
+          projectId={selectedProjectId}
+          isOpen={isModalOpen}
+          onClose={closeModal}
+        />
+      )}
     </div>
   )
 }

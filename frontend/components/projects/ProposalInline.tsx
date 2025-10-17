@@ -485,6 +485,63 @@ export default function ProposalInline({ projectId, userRole }: ProposalInlinePr
     )
   }
 
+  // Check if proposal is empty or still in draft (for customer)
+  const isProposalEmpty = !proposal || (
+    !analysis &&
+    depositAmount === 0 &&
+    duration === 0 &&
+    phases.length === 0 &&
+    teamMembers.length === 0 &&
+    deliverables.length === 0
+  )
+
+  // If customer and proposal is draft or empty, show waiting message
+  if (userRole === 'customer' && (isProposalEmpty || proposal?.status === 'draft')) {
+    return (
+      <div className="bg-gradient-to-br from-yellow-50 to-amber-50 border-2 border-yellow-400 rounded-2xl shadow-xl p-8 animate-fadeIn">
+        <div className="text-center">
+          <div className="text-6xl mb-4 animate-bounce">⏳</div>
+          <h3 className="text-2xl font-bold text-gray-900 mb-3">Đang chờ Sale chuẩn bị đề xuất</h3>
+          <p className="text-gray-700 text-lg mb-4">
+            Sale đang phân tích dự án và chuẩn bị bản thương thảo chi tiết cho bạn.
+          </p>
+          <div className="bg-white rounded-xl p-6 mb-6 max-w-md mx-auto">
+            <div className="space-y-3 text-left">
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 mt-0.5">1</div>
+                <div>
+                  <p className="font-semibold text-gray-900">Sale phân tích yêu cầu</p>
+                  <p className="text-sm text-gray-600">Xác định scope, công nghệ, timeline</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 mt-0.5">2</div>
+                <div>
+                  <p className="font-semibold text-gray-900">Lên kế hoạch chi tiết</p>
+                  <p className="text-sm text-gray-600">Chia giai đoạn, phân công team</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 mt-0.5">3</div>
+                <div>
+                  <p className="font-semibold text-gray-900">Gửi đề xuất cho bạn</p>
+                  <p className="text-sm text-gray-600">Bạn sẽ nhận thông báo ngay lập tức</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 inline-flex items-center gap-3 text-blue-700">
+            <svg className="w-6 h-6 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
+              <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
+            </svg>
+            <span className="font-semibold">Trong lúc chờ, bạn có thể chat với Sale để trao đổi thêm về dự án</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const allApproved = Object.values(approvals).every(v => v === true)
 
   // Debug payment button visibility
@@ -500,24 +557,102 @@ export default function ProposalInline({ projectId, userRole }: ProposalInlinePr
     proposalStatus: proposal?.status
   })
 
+  const getStatusBadge = () => {
+    if (!proposal?.status) return null
+
+    const statusConfig: Record<string, { label: string; color: string; icon: string }> = {
+      draft: { label: 'Bản thảo', color: 'bg-gray-100 text-gray-700 border-gray-300', icon: '📝' },
+      sent: { label: 'Đã gửi', color: 'bg-blue-100 text-blue-700 border-blue-300', icon: '📤' },
+      viewed: { label: 'Đã xem', color: 'bg-purple-100 text-purple-700 border-purple-300', icon: '👁️' },
+      accepted: { label: 'Đã chấp nhận', color: 'bg-green-100 text-green-700 border-green-300', icon: '✅' },
+      rejected: { label: 'Từ chối', color: 'bg-red-100 text-red-700 border-red-300', icon: '❌' },
+      negotiating: { label: 'Đang thương thảo', color: 'bg-yellow-100 text-yellow-700 border-yellow-300', icon: '💬' }
+    }
+
+    const config = statusConfig[proposal.status] || statusConfig.draft
+    return (
+      <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-full font-bold border-2 ${config.color}`}>
+        <span>{config.icon}</span>
+        <span>{config.label}</span>
+      </span>
+    )
+  }
+
+  const handleFinalizeProposal = async () => {
+    if (!proposal?.id) {
+      alert('Lỗi: Chưa có proposal để hoàn tất')
+      return
+    }
+
+    // Validate proposal has required data
+    if (!analysis || depositAmount === 0 || duration === 0 || phases.length === 0 || teamMembers.length === 0) {
+      alert('⚠️ Vui lòng điền đầy đủ tất cả các mục trước khi gửi cho khách hàng:\n\n✅ Phân tích dự án\n✅ Tiền cọc & Thời gian\n✅ Các giai đoạn (ít nhất 1)\n✅ Đội ngũ thực hiện\n✅ Cam kết & phạt vi phạm')
+      return
+    }
+
+    if (!confirm('🚀 Bạn có chắc chắn muốn GỬI BẢN ĐỀ XUẤT này cho khách hàng?\n\nSau khi gửi:\n- Khách hàng sẽ nhận được và có thể xem\n- Bạn vẫn có thể chỉnh sửa nếu cần\n- Khách hàng có thể đồng ý hoặc yêu cầu thương thảo')) {
+      return
+    }
+
+    setSaving(true)
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('access_token')
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/proposals/${proposal.id}/send`,
+        {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+        }
+      )
+
+      if (response.ok) {
+        alert('✅ Đã gửi đề xuất cho khách hàng thành công!\n\nKhách hàng sẽ nhận được thông báo và có thể xem xét đề xuất của bạn.')
+        await loadData() // Reload to get updated status
+      } else {
+        const error = await response.json()
+        alert('Lỗi: ' + (error.detail || error.message || 'Không thể gửi đề xuất'))
+      }
+    } catch (err) {
+      console.error('Failed to finalize proposal:', err)
+      alert('Lỗi khi gửi đề xuất. Vui lòng thử lại.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl shadow-lg p-6 text-white">
-        <h2 className="text-3xl font-bold mb-2">📋 Bản Thương Thảo Dự Án</h2>
-        {project && (
-          <div className="mb-2 text-blue-100">
-            <span className="font-semibold text-white">{project.name}</span>
-            {project.customer && (
-              <span className="ml-3">- Khách hàng: {project.customer.company_name}</span>
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex-1">
+            <h2 className="text-3xl font-bold mb-2">📋 Bản Thương Thảo Dự Án</h2>
+            {project && (
+              <div className="mb-2 text-blue-100">
+                <span className="font-semibold text-white">{project.name}</span>
+                {project.customer && (
+                  <span className="ml-3">- Khách hàng: {project.customer.company_name}</span>
+                )}
+              </div>
             )}
           </div>
-        )}
+          <div className="ml-4">
+            {getStatusBadge()}
+          </div>
+        </div>
+
         <p className="text-blue-100">
           {userRole === 'sale'
-            ? 'Điền thông tin từng phần để gửi cho khách hàng'
+            ? proposal?.status === 'draft'
+              ? 'Điền thông tin từng phần, sau đó hoàn tất để gửi cho khách hàng'
+              : proposal?.status === 'sent'
+              ? 'Đã gửi cho khách hàng. Chờ khách hàng xem và phản hồi.'
+              : proposal?.status === 'viewed'
+              ? 'Khách hàng đã xem. Chờ khách hàng đồng ý các mục.'
+              : 'Khách hàng đang xem xét đề xuất'
             : 'Xem xét và đồng ý từng phần để tiến hành dự án'}
         </p>
+
         {userRole === 'customer' && (
           <div className="mt-4 bg-white/20 rounded-lg p-3">
             <div className="flex items-center justify-between text-sm">
@@ -532,6 +667,32 @@ export default function ProposalInline({ projectId, userRole }: ProposalInlinePr
                 style={{ width: `${(Object.values(approvals).filter(v => v).length / 5) * 100}%` }}
               ></div>
             </div>
+          </div>
+        )}
+
+        {/* Finalize Button for Sale (Draft status only) */}
+        {userRole === 'sale' && proposal?.status === 'draft' && (
+          <div className="mt-4 pt-4 border-t border-white/30">
+            <button
+              onClick={handleFinalizeProposal}
+              disabled={saving}
+              className="w-full px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-bold text-lg hover:from-green-600 hover:to-emerald-700 transition-all duration-200 shadow-xl hover:shadow-2xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-3"
+            >
+              {saving ? (
+                <>
+                  <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Đang gửi...</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-2xl">🚀</span>
+                  <span>Hoàn tất & Gửi cho Khách Hàng</span>
+                </>
+              )}
+            </button>
+            <p className="text-center text-blue-100 text-sm mt-2">
+              Đảm bảo đã điền đầy đủ tất cả các mục trước khi gửi
+            </p>
           </div>
         )}
       </div>

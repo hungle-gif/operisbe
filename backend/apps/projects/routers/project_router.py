@@ -62,6 +62,50 @@ def list_projects(request, status: str = None):
     return result
 
 
+@router.get("/all", response=List[ProjectListOut], auth=auth_bearer)
+def list_all_projects(request, status: str = None):
+    """List all projects (Admin only)"""
+    user = request.auth
+
+    # Only admin can access all projects
+    if user.role != 'admin':
+        return APIResponse.error_response("Permission denied. Admin access required.")
+
+    # Get all projects
+    queryset = Project.objects.all()
+
+    if status:
+        queryset = queryset.filter(status=status)
+
+    projects = queryset.select_related('customer__user', 'project_manager').distinct()
+
+    # Manually serialize to match schema
+    result = []
+    for project in projects:
+        result.append({
+            'id': project.id,
+            'name': project.name,
+            'status': project.status,
+            'priority': project.priority,
+            'customer': {
+                'id': project.customer.id,
+                'company_name': project.customer.company_name,
+                'user_email': project.customer.user.email,
+                'user_name': project.customer.user.full_name
+            },
+            'project_manager': {
+                'id': project.project_manager.id,
+                'full_name': project.project_manager.full_name,
+                'email': project.project_manager.email,
+                'role': project.project_manager.role
+            } if project.project_manager else None,
+            'created_at': project.created_at,
+            'updated_at': project.updated_at
+        })
+
+    return result
+
+
 @router.get("/{project_id}", response=ProjectOut, auth=auth_bearer)
 def get_project(request, project_id: UUID):
     """Get project details"""

@@ -126,3 +126,106 @@ class ProjectService:
         )
 
         return project
+
+    @staticmethod
+    def get_available_developers():
+        """
+        Get all active developers ordered by current workload (ascending)
+        Returns developers with least projects first for load balancing
+        """
+        from apps.users.models import UserRole
+
+        developers = User.objects.filter(
+            role=UserRole.DEV,
+            is_active=True
+        ).annotate(
+            active_projects_count=Count(
+                'assigned_projects',
+                filter=Q(
+                    assigned_projects__status__in=[
+                        ProjectStatus.IN_PROGRESS,
+                        ProjectStatus.PENDING_ACCEPTANCE,
+                        ProjectStatus.REVISION_REQUIRED
+                    ]
+                )
+            )
+        ).order_by('active_projects_count')
+
+        return list(developers)
+
+    @staticmethod
+    def auto_assign_developers(project: Project, num_developers: int = 1):
+        """
+        Automatically assign developers to a project
+        Uses round-robin with load balancing
+
+        Args:
+            project: Project instance to assign developers to
+            num_developers: Number of developers to assign (default: 1)
+
+        Returns:
+            List of assigned developers
+        """
+        available_devs = ProjectService.get_available_developers()
+
+        if not available_devs:
+            return []
+
+        # Select developers with least workload
+        num_to_assign = min(num_developers, len(available_devs))
+        selected_devs = available_devs[:num_to_assign]
+
+        # Add developers to project
+        for dev in selected_devs:
+            project.team_members.add(dev)
+
+            # Add developer to chat participants
+            ChatParticipant.objects.get_or_create(
+                project=project,
+                user=dev
+            )
+
+        project.save()
+
+        # Send system message
+        from apps.projects.models import ChatMessage
+        dev_names = ', '.join([dev.full_name for dev in selected_devs])
+        ChatMessage.objects.create(
+            project=project,
+            sender=project.project_manager if project.project_manager else selected_devs[0],
+            message=f"🎯 Dự án đã được tự động phân công cho: {dev_names}",
+            message_type=ChatMessage.MessageType.SYSTEM
+        )
+
+        return selected_devs
+
+    @staticmethod
+    def auto_assign_on_deposit_approval(project: Project):
+        """
+        Auto-assign developers when deposit is approved
+        Assigns 1-2 developers based on project priority
+
+        Args:
+            project: Project instance
+
+        Returns:
+            List of assigned developers
+        """
+        # Determine number of developers based on priority
+        num_devs = 1  # Default
+
+        if project.priority == 'urgent':
+            num_devs = 2  # Assign 2 developers for urgent projects
+        elif project.priority == 'high':
+            num_devs = 1
+        else:
+            num_devs = 1
+
+        # Auto-assign developers
+        assigned_devs = ProjectService.auto_assign_developers(project, num_devs)
+
+        # Update project status to IN_PROGRESS
+        project.status = ProjectStatus.IN_PROGRESS
+        project.save()
+
+        return assigned_devs

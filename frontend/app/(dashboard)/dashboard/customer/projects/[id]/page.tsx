@@ -106,10 +106,10 @@ export default function ProjectDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50 p-4">
-      <div className="max-w-7xl mx-auto">
-        {/* Compact Header */}
-        <div className="flex items-center justify-between mb-4">
+    <div className="py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
           <button
             onClick={() => router.push('/dashboard/customer')}
             className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
@@ -117,11 +117,11 @@ export default function ProjectDetailPage() {
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            <span className="font-semibold">Dashboard</span>
+            <span className="font-semibold">Quay lại Dashboard</span>
           </button>
           <div className="text-right">
-            <h1 className="text-xl font-bold text-gray-900">Chi tiết dự án</h1>
-            <p className="text-sm text-gray-500">Thương thảo & theo dõi</p>
+            <h1 className="text-3xl font-bold text-gray-900">Chi tiết dự án</h1>
+            <p className="text-gray-600">Thương thảo & theo dõi tiến độ</p>
           </div>
         </div>
 
@@ -155,22 +155,19 @@ export default function ProjectDetailPage() {
           </div>
         )}
 
-        {/* Optimized Layout - Split 50/50 */}
-        <div className="grid lg:grid-cols-2 gap-4">
-          {/* Left - Project Info (Compact) */}
-          <div>
-            <ProjectInfoCompact project={project} />
-          </div>
-
-          {/* Right - Chat (Full height) */}
-          <div className="lg:sticky lg:top-4" style={{ height: 'fit-content' }}>
-            <ChatBoxCompact projectId={projectId} currentUserId={currentUserId} />
-          </div>
+        {/* Project Info Card */}
+        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+          <ProjectInfoCompact project={project} />
         </div>
 
-        {/* Proposal Inline */}
-        <div className="mt-6">
+        {/* Proposal Inline - Full Details */}
+        <div className="mb-6">
           <ProposalInline projectId={projectId} userRole="customer" />
+        </div>
+
+        {/* Chat Box */}
+        <div className="bg-white rounded-2xl shadow-lg">
+          <ChatBoxCompact projectId={projectId} currentUserId={currentUserId} />
         </div>
       </div>
     </div>

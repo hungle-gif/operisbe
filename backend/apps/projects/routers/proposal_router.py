@@ -386,6 +386,10 @@ def submit_payment(request, proposal_id: str):
     proposal.project.start_date = now.date()
     proposal.project.save()
 
+    # 🎯 AUTO-ASSIGN DEVELOPERS WHEN DEPOSIT IS APPROVED
+    from apps.projects.services.project_service import ProjectService
+    assigned_devs = ProjectService.auto_assign_on_deposit_approval(proposal.project)
+
     return serialize_proposal(proposal)
 
 
@@ -427,6 +431,10 @@ def confirm_deposit_payment(request, proposal_id: str):
     proposal.project.status = ProjectStatus.IN_PROGRESS
     proposal.project.start_date = timezone.now().date()
     proposal.project.save()
+
+    # 🎯 AUTO-ASSIGN DEVELOPERS WHEN DEPOSIT IS APPROVED
+    from apps.projects.services.project_service import ProjectService
+    assigned_devs = ProjectService.auto_assign_on_deposit_approval(proposal.project)
 
     return serialize_proposal(proposal)
 

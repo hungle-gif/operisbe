@@ -39,9 +39,11 @@ export default function LoginPage() {
         case 'admin':
           redirectPath = '/dashboard/admin'
           break
+        case 'sale':
         case 'sales':
           redirectPath = '/dashboard/sales'
           break
+        case 'dev':
         case 'developer':
           redirectPath = '/dashboard/developer'
           break
