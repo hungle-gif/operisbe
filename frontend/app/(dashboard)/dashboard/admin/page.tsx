@@ -2,9 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useRoleProtection } from '@/hooks/useRoleProtection'
 
 export default function AdminDashboard() {
   const router = useRouter()
+
+  // 🔒 PROTECTION: Only admin can access this dashboard
+  useRoleProtection({ allowedRoles: ['admin'] })
+
   const [stats, setStats] = useState({
     totalUsers: 0,
     totalProjects: 0,

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useAuth } from '@/hooks/useAuth'
 import ServiceAccordionV2 from '@/components/services/ServiceAccordionV2'
 import { servicesAPI, projectsAPI } from '@/lib/api'
 
@@ -48,6 +49,10 @@ interface NegotiationProject {
 
 export default function CustomerDashboard() {
   const router = useRouter()
+
+  // Protect route - only customer can access
+  useAuth({ requiredRole: 'customer' })
+
   const [services, setServices] = useState<ServiceSummary[]>([])
   const [serviceDetails, setServiceDetails] = useState<Record<string, ServiceDetail>>({})
   const [loading, setLoading] = useState(true)

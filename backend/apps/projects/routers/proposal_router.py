@@ -7,7 +7,7 @@ from ninja import Router
 from ninja.errors import HttpError
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from api.dependencies.current_user import auth_bearer
+from api.dependencies.current_user import auth_bearer, require_roles
 from apps.projects.models import Proposal, ProposalStatus, Project, ProjectStatus
 from apps.projects.schemas.proposal_schema import (
     ProposalCreate,
@@ -80,15 +80,12 @@ def serialize_proposal(proposal):
 
 
 @router.post("/projects/{project_id}/proposals", response=ProposalOut, auth=auth_bearer)
+@require_roles('admin', 'sales')
 def create_proposal(request, project_id: str, payload: ProposalCreate):
     """
-    Create a new proposal for a project (Sales only)
+    🔒 ADMIN/SALES ONLY: Create a new proposal for a project
     """
     user = request.auth
-
-    # Only sales can create proposals
-    if user.role not in ['sales', 'admin']:
-        raise HttpError(403, "Only sales can create proposals")
 
     project = get_object_or_404(Project, id=project_id)
 
@@ -138,11 +135,12 @@ def create_proposal(request, project_id: str, payload: ProposalCreate):
 
 
 @router.get("/projects/{project_id}/proposals", response=List[ProposalOut], auth=auth_bearer)
+@require_roles('admin', 'sales', 'customer')
 def list_proposals(request, project_id: str):
     """
     List all proposals for a project
-    Customer can only see SENT, VIEWED, ACCEPTED, REJECTED, NEGOTIATING
-    Sales can see all including DRAFT
+    - Customer: only see SENT+ (not DRAFT) for their own projects
+    - Sales/Admin: see all including DRAFT
     """
     user = request.auth
     project = get_object_or_404(Project, id=project_id)
@@ -151,7 +149,7 @@ def list_proposals(request, project_id: str):
     if user.role == 'customer':
         # Customer must be the project's customer
         if project.customer.user != user:
-            raise HttpError(403, "Not authorized to view proposals for this project")
+            raise HttpError(403, "You can only view proposals for your own projects")
 
     proposals = Proposal.objects.filter(project=project).select_related('created_by', 'project')
 
@@ -169,6 +167,7 @@ def list_proposals(request, project_id: str):
 
 
 @router.get("/proposals/{proposal_id}", response=ProposalOut, auth=auth_bearer)
+@require_roles('admin', 'sales', 'customer')
 def get_proposal(request, proposal_id: str):
     """
     Get proposal details
@@ -181,7 +180,7 @@ def get_proposal(request, proposal_id: str):
     if user.role == 'customer':
         # Customer must be the project's customer
         if proposal.project.customer.user != user:
-            raise HttpError(403, "Not authorized to view this proposal")
+            raise HttpError(403, "You can only view proposals for your own projects")
 
         # Mark as viewed if it was sent
         if proposal.status == ProposalStatus.SENT:
@@ -223,6 +222,38 @@ def update_proposal(request, proposal_id: str, payload: ProposalUpdate):
     if proposal.status in [ProposalStatus.ACCEPTED, ProposalStatus.REJECTED]:
         raise HttpError(400, "Cannot update accepted or rejected proposal")
 
+    # 🚫 IMPORTANT: Cannot add/edit/remove phases after proposal is SENT
+    # Once sent to customer, phases are locked to prevent confusion
+    if 'phases' in update_data and proposal.status != ProposalStatus.DRAFT:
+        raise HttpError(400, "Cannot modify phases after proposal has been sent. Create a new proposal instead.")
+
+    # 🚫 IMPORTANT: Cannot edit phases that have been paid
+    if 'phases' in update_data and update_data['phases']:
+        # Get existing phases with payment status
+        existing_phases = proposal.phases or []
+        new_phases = update_data['phases']
+
+        # Check each phase - if already paid, cannot modify
+        for idx, new_phase in enumerate(new_phases):
+            if idx < len(existing_phases):
+                existing_phase = existing_phases[idx]
+                # If phase is already paid, prevent modification
+                if existing_phase.get('payment_approved'):
+                    # Check if phase data changed (excluding payment fields)
+                    existing_copy = {k: v for k, v in existing_phase.items()
+                                   if k not in ['payment_submitted', 'payment_submitted_at',
+                                              'payment_approved', 'payment_approved_at',
+                                              'payment_approved_by', 'payment_proof',
+                                              'completed', 'completed_at', 'completed_by']}
+                    new_copy = {k: v for k, v in (new_phase.dict() if hasattr(new_phase, 'dict') else new_phase).items()
+                              if k not in ['payment_submitted', 'payment_submitted_at',
+                                         'payment_approved', 'payment_approved_at',
+                                         'payment_approved_by', 'payment_proof',
+                                         'completed', 'completed_at', 'completed_by']}
+
+                    if existing_copy != new_copy:
+                        raise HttpError(400, f"Cannot modify phase '{existing_phase.get('name', idx+1)}' - payment already approved")
+
     # Convert nested objects
     if 'phases' in update_data and update_data['phases']:
         phases_data = []
@@ -257,15 +288,13 @@ def update_proposal(request, proposal_id: str, payload: ProposalUpdate):
 
 
 @router.post("/proposals/{proposal_id}/send", response=ProposalOut, auth=auth_bearer)
+@require_roles('admin', 'sales')
 def send_proposal(request, proposal_id: str):
     """
-    Send proposal to customer (Sales only)
+    🔒 ADMIN/SALES ONLY: Send proposal to customer
     Changes status from DRAFT to SENT
     """
     user = request.auth
-
-    if user.role not in ['sales', 'admin']:
-        raise HttpError(403, "Only sales can send proposals")
 
     proposal = get_object_or_404(Proposal, id=proposal_id)
 
@@ -281,21 +310,28 @@ def send_proposal(request, proposal_id: str):
 
 
 @router.post("/proposals/{proposal_id}/accept", response=ProposalOut, auth=auth_bearer)
+@require_roles('customer', 'no_admin')
 def accept_proposal(request, proposal_id: str, payload: CustomerResponse):
     """
-    Customer accepts the proposal
+    🔒 CUSTOMER ONLY: Accept the proposal
     Changes project status to DEPOSIT (waiting for deposit payment)
     """
     user = request.auth
     proposal = get_object_or_404(Proposal, id=proposal_id)
 
     # Must be customer of the project
-    if user.role != 'customer' or proposal.project.customer.user != user:
-        raise HttpError(403, "Not authorized")
+    if proposal.project.customer.user != user:
+        raise HttpError(403, "You can only accept proposals for your own projects")
 
-    if proposal.status in [ProposalStatus.ACCEPTED, ProposalStatus.REJECTED]:
-        raise HttpError(400, "Proposal already responded to")
+    # Cannot accept if already rejected
+    if proposal.status == ProposalStatus.REJECTED:
+        raise HttpError(400, "Proposal has been rejected")
 
+    # If already accepted, just return (idempotent)
+    if proposal.status == ProposalStatus.ACCEPTED:
+        return serialize_proposal(proposal)
+
+    # Accept the proposal
     proposal.status = ProposalStatus.ACCEPTED
     proposal.accepted_at = timezone.now()
     proposal.customer_notes = payload.customer_notes
@@ -309,17 +345,18 @@ def accept_proposal(request, proposal_id: str, payload: CustomerResponse):
 
 
 @router.post("/proposals/{proposal_id}/reject", response=ProposalOut, auth=auth_bearer)
+@require_roles('customer', 'no_admin')
 def reject_proposal(request, proposal_id: str, payload: CustomerResponse):
     """
-    Customer rejects the proposal
+    🔒 CUSTOMER ONLY: Reject the proposal
     Changes status to NEGOTIATING (continue discussion)
     """
     user = request.auth
     proposal = get_object_or_404(Proposal, id=proposal_id)
 
     # Must be customer of the project
-    if user.role != 'customer' or proposal.project.customer.user != user:
-        raise HttpError(403, "Not authorized")
+    if proposal.project.customer.user != user:
+        raise HttpError(403, "You can only reject proposals for your own projects")
 
     if proposal.status in [ProposalStatus.ACCEPTED, ProposalStatus.REJECTED]:
         raise HttpError(400, "Proposal already responded to")
@@ -334,9 +371,10 @@ def reject_proposal(request, proposal_id: str, payload: CustomerResponse):
 
 
 @router.post("/proposals/{proposal_id}/submit-payment", response=ProposalOut, auth=auth_bearer)
+@require_roles('customer', 'no_admin')
 def submit_payment(request, proposal_id: str):
     """
-    Customer submits deposit payment (AUTO APPROVED)
+    🔒 CUSTOMER ONLY: Submit deposit payment (AUTO APPROVED)
 
     Flow (SIMPLIFIED - AUTO APPROVE):
     1. Customer clicks "Đã Thanh Toán" → AUTO APPROVED
@@ -349,8 +387,8 @@ def submit_payment(request, proposal_id: str):
     proposal = get_object_or_404(Proposal, id=proposal_id)
 
     # Must be customer of the project
-    if user.role != 'customer' or proposal.project.customer.user != user:
-        raise HttpError(403, "Not authorized")
+    if proposal.project.customer.user != user:
+        raise HttpError(403, "You can only submit payment for your own projects")
 
     # Proposal must be accepted
     if proposal.status != ProposalStatus.ACCEPTED:
@@ -398,18 +436,16 @@ def submit_payment(request, proposal_id: str):
 
 
 @router.post("/proposals/{proposal_id}/confirm-payment", response=ProposalOut, auth=auth_bearer)
+@require_roles('admin', 'sales')
 def confirm_deposit_payment(request, proposal_id: str):
     """
-    [DEPRECATED] Use /approve-payment instead
+    🔒 ADMIN/SALES ONLY: [DEPRECATED] Confirm deposit payment
+    Use /submit-payment instead (auto-approved flow)
 
     Admin/Sale confirms that deposit payment has been received
     Changes project status from DEPOSIT to IN_PROGRESS (starts project timeline)
     """
     user = request.auth
-
-    # Only admin or sales can confirm payment
-    if user.role not in ['admin', 'sales']:
-        raise HttpError(403, "Only admin or sales can confirm payment")
 
     proposal = get_object_or_404(Proposal, id=proposal_id)
 
@@ -443,20 +479,17 @@ def confirm_deposit_payment(request, proposal_id: str):
 
 
 @router.post("/proposals/{proposal_id}/phases/{phase_index}/complete", response=ProposalOut, auth=auth_bearer)
+@require_roles('admin', 'sales')
 def mark_phase_complete(request, proposal_id: str, phase_index: int):
     """
-    Sales/Admin marks a phase as completed
+    🔒 ADMIN/SALES ONLY: Mark a phase as completed
 
     Flow:
     1. Sale completes phase work → Marks as complete (THIS ENDPOINT)
     2. Customer reviews completed work → Submits payment
-    3. Admin approves payment → Phase paid, next phase can start
+    3. Auto-approved → Phase paid, next phase can start
     """
     user = request.auth
-
-    # Only sales or admin can mark phase complete
-    if user.role not in ['sales', 'admin']:
-        raise HttpError(403, "Only sales or admin can mark phase as complete")
 
     proposal = get_object_or_404(Proposal, id=proposal_id)
 
@@ -497,9 +530,10 @@ def mark_phase_complete(request, proposal_id: str, phase_index: int):
 
 
 @router.post("/proposals/{proposal_id}/phases/{phase_index}/submit-payment", response=ProposalOut, auth=auth_bearer)
+@require_roles('customer', 'no_admin')
 def submit_phase_payment(request, proposal_id: str, phase_index: int):
     """
-    Customer submits payment for a completed phase
+    🔒 CUSTOMER ONLY: Submit payment for a completed phase
 
     Flow (SIMPLIFIED - AUTO APPROVE):
     1. Sale marks phase complete
@@ -510,8 +544,8 @@ def submit_phase_payment(request, proposal_id: str, phase_index: int):
     proposal = get_object_or_404(Proposal, id=proposal_id)
 
     # Must be customer of the project
-    if user.role != 'customer' or proposal.project.customer.user != user:
-        raise HttpError(403, "Not authorized")
+    if proposal.project.customer.user != user:
+        raise HttpError(403, "You can only submit payment for your own projects")
 
     # Proposal must be accepted
     if proposal.status != ProposalStatus.ACCEPTED:

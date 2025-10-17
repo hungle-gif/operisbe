@@ -89,53 +89,53 @@ export const projectsAPI = {
 // Proposals API
 export const proposalsAPI = {
   // List proposals for a project
-  list: (projectId: string) => api.get(`/proposals/projects/${projectId}/proposals`),
+  list: (projectId: string) => api.get(`/projects/${projectId}/proposals`),
 
   // Get single proposal
-  get: (proposalId: string) => api.get(`/proposals/proposals/${proposalId}`),
+  get: (proposalId: string) => api.get(`/proposals/${proposalId}`),
 
   // Create new proposal (sales only)
-  create: (projectId: string, data: any) => api.post(`/proposals/projects/${projectId}/proposals`, data),
+  create: (projectId: string, data: any) => api.post(`/projects/${projectId}/proposals`, data),
 
   // Update proposal (sales only, draft only)
-  update: (proposalId: string, data: any) => api.put(`/proposals/proposals/${proposalId}`, data),
+  update: (proposalId: string, data: any) => api.put(`/proposals/${proposalId}`, data),
 
   // Send proposal to customer (sales only)
-  send: (proposalId: string) => api.post(`/proposals/proposals/${proposalId}/send`, {}),
+  send: (proposalId: string) => api.post(`/proposals/${proposalId}/send`, {}),
 
   // Customer accepts proposal
-  accept: (proposalId: string, data?: any) => api.post(`/proposals/proposals/${proposalId}/accept`, data || {}),
+  accept: (proposalId: string, data?: any) => api.post(`/proposals/${proposalId}/accept`, data || {}),
 
   // Customer rejects proposal
-  reject: (proposalId: string, data?: any) => api.post(`/proposals/proposals/${proposalId}/reject`, data || {}),
+  reject: (proposalId: string, data?: any) => api.post(`/proposals/${proposalId}/reject`, data || {}),
 
   // === DEPOSIT PAYMENT (Initial payment) ===
   // Customer submits deposit payment notification (waiting for admin approval)
-  submitPayment: (proposalId: string) => api.post(`/proposals/proposals/${proposalId}/submit-payment`, {}),
+  submitPayment: (proposalId: string) => api.post(`/proposals/${proposalId}/submit-payment`, {}),
 
   // Admin/Sales approves customer's deposit payment submission
-  approvePayment: (proposalId: string) => api.post(`/proposals/proposals/${proposalId}/approve-payment`, {}),
+  approvePayment: (proposalId: string) => api.post(`/proposals/${proposalId}/approve-payment`, {}),
 
   // Admin/Sales rejects customer's deposit payment submission
-  rejectPayment: (proposalId: string) => api.post(`/proposals/proposals/${proposalId}/reject-payment`, {}),
+  rejectPayment: (proposalId: string) => api.post(`/proposals/${proposalId}/reject-payment`, {}),
 
   // === PHASE-BASED PAYMENT (Per milestone) ===
   // Sales/Admin marks phase as completed
   markPhaseComplete: (proposalId: string, phaseIndex: number) =>
-    api.post(`/proposals/proposals/${proposalId}/phases/${phaseIndex}/complete`, {}),
+    api.post(`/proposals/${proposalId}/phases/${phaseIndex}/complete`, {}),
 
   // Customer submits phase payment
   submitPhasePayment: (proposalId: string, phaseIndex: number) =>
-    api.post(`/proposals/proposals/${proposalId}/phases/${phaseIndex}/submit-payment`, {}),
+    api.post(`/proposals/${proposalId}/phases/${phaseIndex}/submit-payment`, {}),
 
   // Admin/Sales approves phase payment
   approvePhasePayment: (proposalId: string, phaseIndex: number) =>
-    api.post(`/proposals/proposals/${proposalId}/phases/${phaseIndex}/approve-payment`, {}),
+    api.post(`/proposals/${proposalId}/phases/${phaseIndex}/approve-payment`, {}),
 
   // Admin/Sales rejects phase payment
   rejectPhasePayment: (proposalId: string, phaseIndex: number) =>
-    api.post(`/proposals/proposals/${proposalId}/phases/${phaseIndex}/reject-payment`, {}),
+    api.post(`/proposals/${proposalId}/phases/${phaseIndex}/reject-payment`, {}),
 
   // [DEPRECATED] Use approvePayment instead
-  confirmPayment: (proposalId: string) => api.post(`/proposals/proposals/${proposalId}/confirm-payment`, {}),
+  confirmPayment: (proposalId: string) => api.post(`/proposals/${proposalId}/confirm-payment`, {}),
 }

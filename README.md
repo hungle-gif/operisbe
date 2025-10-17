@@ -75,6 +75,7 @@ docker-compose up -d
 
 5. **Tạo superuser cho admin**
 ```bash
+exec -it operis_postgres psql -U operis_user -d operis_db
 docker exec -it operis_backend python manage.py createsuperuser
 ```
 

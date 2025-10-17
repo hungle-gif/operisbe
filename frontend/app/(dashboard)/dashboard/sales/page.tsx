@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { projectsAPI } from '@/lib/api'
 import Link from 'next/link'
+import { useRoleProtection } from '@/hooks/useRoleProtection'
 
 interface Project {
   id: string
@@ -19,6 +20,9 @@ interface Project {
 }
 
 export default function SalesDashboard() {
+  // 🔒 PROTECTION: Only sales can access this dashboard
+  useRoleProtection({ allowedRoles: ['sale', 'sales'] })
+
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<string>('all')

@@ -4,12 +4,13 @@ Project API endpoints
 from uuid import UUID
 from typing import List
 from ninja import Router
+from ninja.errors import HttpError
 from django.utils import timezone
 from apps.projects.models import Project, ChatMessage, ChatParticipant
 from apps.projects.schemas.project_schema import (
     ProjectOut, ProjectListOut, ChatMessageOut, ChatMessageCreate
 )
-from api.dependencies.current_user import auth_bearer
+from api.dependencies.current_user import auth_bearer, require_roles
 from core.responses.api_response import APIResponse
 
 router = Router(tags=['Projects'])
@@ -63,13 +64,10 @@ def list_projects(request, status: str = None):
 
 
 @router.get("/all", response=List[ProjectListOut], auth=auth_bearer)
+@require_roles('admin')
 def list_all_projects(request, status: str = None):
-    """List all projects (Admin only)"""
+    """🔒 ADMIN ONLY: List all projects in the system"""
     user = request.auth
-
-    # Only admin can access all projects
-    if user.role != 'admin':
-        return APIResponse.error_response("Permission denied. Admin access required.")
 
     # Get all projects
     queryset = Project.objects.all()

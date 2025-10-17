@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useRoleProtection } from '@/hooks/useRoleProtection'
 
 interface FinanceDashboard {
   summary: {
@@ -28,6 +29,10 @@ interface ProjectFinancial {
 
 export default function AdminFinancePage() {
   const router = useRouter()
+
+  // 🔒 PROTECTION: Only admin can access finance
+  useRoleProtection({ allowedRoles: ['admin'] })
+
   const [dashboard, setDashboard] = useState<FinanceDashboard | null>(null)
   const [loading, setLoading] = useState(true)
   const [topCustomers, setTopCustomers] = useState<any[]>([])

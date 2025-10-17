@@ -27,7 +27,7 @@ api.add_router("/auth", auth_router)
 api.add_router("/users", user_router)
 api.add_router("/services", service_router)
 api.add_router("/projects", project_router)
-api.add_router("/proposals", proposal_router)
+api.add_router("", proposal_router)  # Proposal router already has full paths
 api.add_router("/feedback", feedback_router)
 api.add_router("/finance", finance_router)
 api.add_router("/transactions", transaction_router)

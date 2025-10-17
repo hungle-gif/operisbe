@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useRoleProtection } from '@/hooks/useRoleProtection'
 
 interface User {
   id: string
@@ -14,6 +15,10 @@ interface User {
 
 export default function AdminUsersPage() {
   const router = useRouter()
+
+  // 🔒 PROTECTION: Only admin can access user management
+  useRoleProtection({ allowedRoles: ['admin'] })
+
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)

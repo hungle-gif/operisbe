@@ -24,14 +24,14 @@ export default function LoginPage() {
       const { access_token, refresh_token, user } = response.data
 
       // Save tokens to localStorage
-      localStorage.setItem('token', access_token) // Use 'token' as key for consistency
+      localStorage.setItem('token', access_token)
       localStorage.setItem('access_token', access_token)
       localStorage.setItem('refresh_token', refresh_token)
       localStorage.setItem('user', JSON.stringify(user))
 
       // Debug: Log user role
       console.log('User role:', user.role)
-      console.log('Redirecting to:', `/dashboard/${user.role === 'sales' ? 'sales' : user.role === 'customer' ? 'customer' : user.role === 'admin' ? 'admin' : user.role === 'developer' ? 'developer' : ''}`)
+      console.log('Token saved to localStorage')
 
       // Redirect based on user role
       let redirectPath = '/dashboard'

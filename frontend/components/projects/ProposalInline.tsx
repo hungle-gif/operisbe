@@ -285,16 +285,53 @@ export default function ProposalInline({ projectId, userRole }: ProposalInlinePr
   }
 
   const confirmApproval = async () => {
+    console.log('🔵 ===== confirmApproval CALLED =====')
+    console.log('📋 pendingApproval:', pendingApproval)
+    console.log('📋 current approvals:', approvals)
+
     if (!pendingApproval) return
 
     const newApprovals = { ...approvals, [pendingApproval]: true }
+    console.log('📋 NEW approvals after this click:', newApprovals)
     setApprovals(newApprovals)
 
     if (proposal?.id) {
       try {
+        // Update approvals
+        console.log('📤 Updating proposal with new approvals...')
         await proposalsAPI.update(proposal.id, { customer_approvals: newApprovals })
+        console.log('✅ Approvals updated successfully!')
+
+        // Check if all 5 items are now approved
+        const allApproved = Object.values(newApprovals).every(v => v === true)
+        console.log('🔍 allApproved check:', allApproved)
+        console.log('🔍 newApprovals values:', Object.values(newApprovals))
+        console.log('🔍 proposal.status:', proposal.status)
+
+        // If all approved AND proposal is not yet ACCEPTED, automatically accept it
+        if (allApproved && proposal.status !== 'accepted') {
+          console.log('🎯 All items approved! Auto-accepting proposal...')
+          console.log('📤 Calling proposalsAPI.accept with proposal ID:', proposal.id)
+          try {
+            const acceptResponse = await proposalsAPI.accept(proposal.id, { customer_notes: 'Đã đồng ý tất cả các mục' })
+            console.log('✅ Proposal accepted successfully! Response:', acceptResponse.data)
+            alert('✅ Bạn đã đồng ý tất cả các mục!\n\nBạn có thể thanh toán tiền cọc để bắt đầu dự án.')
+            console.log('🔄 Reloading data to get updated status...')
+            await loadData() // Reload to get updated status
+            console.log('✅ Data reloaded!')
+          } catch (err: any) {
+            console.error('❌ Failed to accept proposal:', err)
+            console.error('❌ Error response:', err.response?.data)
+            alert('Lỗi khi chấp nhận đề xuất: ' + (err.response?.data?.detail || err.message))
+          }
+        } else {
+          console.log('ℹ️ NOT auto-accepting because:')
+          console.log('   - allApproved:', allApproved)
+          console.log('   - proposal.status:', proposal.status)
+          console.log('   - status !== "accepted":', proposal.status !== 'accepted')
+        }
       } catch (err) {
-        console.error('Failed to update approval:', err)
+        console.error('❌ Failed to update approval:', err)
         alert('Lỗi khi cập nhật đồng ý. Vui lòng thử lại.')
         // Revert on error
         setApprovals(approvals)
@@ -304,6 +341,7 @@ export default function ProposalInline({ projectId, userRole }: ProposalInlinePr
     // Reset state
     setPendingApproval(null)
     setShowApprovalModal(null)
+    console.log('🔵 ===== confirmApproval COMPLETED =====')
   }
 
   const formatCurrency = (amount: number) => {
@@ -486,17 +524,9 @@ export default function ProposalInline({ projectId, userRole }: ProposalInlinePr
   }
 
   // Check if proposal is empty or still in draft (for customer)
-  const isProposalEmpty = !proposal || (
-    !analysis &&
-    depositAmount === 0 &&
-    duration === 0 &&
-    phases.length === 0 &&
-    teamMembers.length === 0 &&
-    deliverables.length === 0
-  )
-
-  // If customer and proposal is draft or empty, show waiting message
-  if (userRole === 'customer' && (isProposalEmpty || proposal?.status === 'draft')) {
+  // IMPORTANT: Only show waiting banner if status is 'draft' or proposal doesn't exist
+  // If status is 'sent' or later, always show the content (even if empty)
+  if (userRole === 'customer' && (!proposal || proposal?.status === 'draft')) {
     return (
       <div className="bg-gradient-to-br from-yellow-50 to-amber-50 border-2 border-yellow-400 rounded-2xl shadow-xl p-8 animate-fadeIn">
         <div className="text-center">
@@ -889,9 +919,15 @@ export default function ProposalInline({ projectId, userRole }: ProposalInlinePr
             {userRole === 'sale' && (
               <button
                 onClick={() => setEditMode(editMode === 'phases' ? null : 'phases')}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
+                disabled={proposal?.status !== 'draft'}
+                className={`px-4 py-2 rounded-lg transition-colors font-medium ${
+                  proposal?.status !== 'draft'
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-blue-500 text-white hover:bg-blue-600'
+                }`}
+                title={proposal?.status !== 'draft' ? '🔒 Không thể sửa giai đoạn sau khi gửi cho khách hàng' : ''}
               >
-                {editMode === 'phases' ? '✕ Hủy' : '✏️ Chỉnh sửa'}
+                {editMode === 'phases' ? '✕ Hủy' : proposal?.status !== 'draft' ? '🔒 Đã khóa' : '✏️ Chỉnh sửa'}
               </button>
             )}
           </div>
@@ -899,64 +935,83 @@ export default function ProposalInline({ projectId, userRole }: ProposalInlinePr
 
         {editMode === 'phases' && userRole === 'sale' ? (
           <div className="space-y-4 animate-fadeIn">
-            {phases.map((phase, index) => (
-              <div key={index} className="border-2 border-blue-200 rounded-lg p-4 bg-gradient-to-br from-blue-50 to-indigo-50">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Tên giai đoạn</label>
-                    <input
-                      type="text"
-                      value={phase.name}
-                      onChange={(e) => updatePhase(index, 'name', e.target.value)}
-                      className="w-full border rounded-lg p-2 focus:border-blue-500 focus:outline-none"
-                      placeholder="VD: Giai đoạn 1 - Phân tích"
-                    />
+            {phases.map((phase, index) => {
+              const isPhasePaid = phase.payment_approved || false
+              return (
+                <div key={index} className={`border-2 rounded-lg p-4 ${
+                  isPhasePaid
+                    ? 'border-green-500 bg-gradient-to-br from-green-50 to-emerald-50'
+                    : 'border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50'
+                }`}>
+                  {isPhasePaid && (
+                    <div className="mb-3 px-3 py-2 bg-green-100 border border-green-300 rounded-lg text-sm text-green-800 font-semibold">
+                      🔒 Giai đoạn này đã được thanh toán - Không thể chỉnh sửa
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Tên giai đoạn</label>
+                      <input
+                        type="text"
+                        value={phase.name}
+                        onChange={(e) => updatePhase(index, 'name', e.target.value)}
+                        disabled={isPhasePaid}
+                        className="w-full border rounded-lg p-2 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        placeholder="VD: Giai đoạn 1 - Phân tích"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Số ngày</label>
+                      <input
+                        type="number"
+                        value={phase.days}
+                        onChange={(e) => updatePhase(index, 'days', Number(e.target.value))}
+                        disabled={isPhasePaid}
+                        className="w-full border rounded-lg p-2 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Số tiền (VND)</label>
+                      <input
+                        type="number"
+                        value={phase.amount}
+                        onChange={(e) => updatePhase(index, 'amount', Number(e.target.value))}
+                        disabled={isPhasePaid}
+                        className="w-full border rounded-lg p-2 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">% Thanh toán</label>
+                      <input
+                        type="number"
+                        value={phase.payment_percentage}
+                        onChange={(e) => updatePhase(index, 'payment_percentage', Number(e.target.value))}
+                        disabled={isPhasePaid}
+                        className="w-full border rounded-lg p-2 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium mb-1">Công việc</label>
+                      <textarea
+                        value={phase.tasks}
+                        onChange={(e) => updatePhase(index, 'tasks', e.target.value)}
+                        disabled={isPhasePaid}
+                        className="w-full border rounded-lg p-2 h-20 focus:border-blue-500 focus:outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        placeholder="Mô tả chi tiết công việc trong giai đoạn này..."
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Số ngày</label>
-                    <input
-                      type="number"
-                      value={phase.days}
-                      onChange={(e) => updatePhase(index, 'days', Number(e.target.value))}
-                      className="w-full border rounded-lg p-2 focus:border-blue-500 focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Số tiền (VND)</label>
-                    <input
-                      type="number"
-                      value={phase.amount}
-                      onChange={(e) => updatePhase(index, 'amount', Number(e.target.value))}
-                      className="w-full border rounded-lg p-2 focus:border-blue-500 focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">% Thanh toán</label>
-                    <input
-                      type="number"
-                      value={phase.payment_percentage}
-                      onChange={(e) => updatePhase(index, 'payment_percentage', Number(e.target.value))}
-                      className="w-full border rounded-lg p-2 focus:border-blue-500 focus:outline-none"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-sm font-medium mb-1">Công việc</label>
-                    <textarea
-                      value={phase.tasks}
-                      onChange={(e) => updatePhase(index, 'tasks', e.target.value)}
-                      className="w-full border rounded-lg p-2 h-20 focus:border-blue-500 focus:outline-none"
-                      placeholder="Mô tả chi tiết công việc trong giai đoạn này..."
-                    />
-                  </div>
+                  {!isPhasePaid && (
+                    <button
+                      onClick={() => removePhase(index)}
+                      className="mt-2 text-sm text-red-600 hover:text-red-800 font-medium"
+                    >
+                      🗑️ Xóa giai đoạn
+                    </button>
+                  )}
                 </div>
-                <button
-                  onClick={() => removePhase(index)}
-                  className="mt-2 text-sm text-red-600 hover:text-red-800 font-medium"
-                >
-                  🗑️ Xóa giai đoạn
-                </button>
-              </div>
-            ))}
+              )
+            })}
             <div className="flex gap-2">
               <button
                 onClick={addPhase}

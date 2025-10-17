@@ -9,6 +9,25 @@ interface ProjectDetailModalProps {
   onClose: () => void
 }
 
+interface Phase {
+  name: string
+  days: number
+  amount: number
+  payment_percentage: number
+  tasks: string
+  completed?: boolean
+  completed_at?: string
+  completed_by?: string
+  payment_submitted?: boolean
+  payment_approved?: boolean
+}
+
+interface Proposal {
+  id: string
+  phases: Phase[]
+  status: string
+}
+
 interface ProjectDetail {
   id: string
   name: string
@@ -39,6 +58,7 @@ interface ProjectDetail {
 
 export default function ProjectDetailModal({ projectId, isOpen, onClose }: ProjectDetailModalProps) {
   const [project, setProject] = useState<ProjectDetail | null>(null)
+  const [proposal, setProposal] = useState<Proposal | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'overview' | 'tech' | 'chat'>('overview')
 
@@ -53,12 +73,24 @@ export default function ProjectDetailModal({ projectId, isOpen, onClose }: Proje
     const token = localStorage.getItem('token') || localStorage.getItem('access_token')
 
     try {
+      // Load project details
       const projectRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/projects/${projectId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
       if (projectRes.ok) {
         const projectData = await projectRes.json()
         setProject(projectData)
+      }
+
+      // Load proposals to get phases
+      const proposalRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/projects/${projectId}/proposals`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      if (proposalRes.ok) {
+        const proposalData = await proposalRes.json()
+        if (proposalData && proposalData.length > 0) {
+          setProposal(proposalData[0])
+        }
       }
     } catch (err) {
       console.error('Failed to load project details:', err)
@@ -337,6 +369,92 @@ export default function ProjectDetailModal({ projectId, isOpen, onClose }: Proje
                 {/* Tech Tab */}
                 {activeTab === 'tech' && (
                   <div className="space-y-6">
+                    {/* Project Phases & Tasks */}
+                    {proposal && proposal.phases && proposal.phases.length > 0 && (
+                      <div className="bg-white border-2 rounded-xl p-6">
+                        <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                          <Calendar className="w-5 h-5 text-purple-600" />
+                          Các giai đoạn thực hiện
+                        </h3>
+                        <div className="space-y-4">
+                          {proposal.phases.map((phase, index) => {
+                            const isCompleted = phase.completed || false
+                            const isPaid = phase.payment_approved || false
+                            return (
+                              <div
+                                key={index}
+                                className={`border-2 rounded-xl p-5 transition-all ${
+                                  isPaid
+                                    ? 'border-green-400 bg-gradient-to-br from-green-50 to-emerald-50'
+                                    : isCompleted
+                                    ? 'border-blue-400 bg-gradient-to-br from-blue-50 to-cyan-50'
+                                    : 'border-gray-300 bg-white'
+                                }`}
+                              >
+                                <div className="flex items-start justify-between mb-3">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-3 mb-2">
+                                      <h4 className="text-lg font-bold text-gray-900">
+                                        Giai đoạn {index + 1}: {phase.name}
+                                      </h4>
+                                      {isPaid ? (
+                                        <span className="px-3 py-1 bg-green-600 text-white rounded-full text-xs font-bold">
+                                          ✓ Đã thanh toán
+                                        </span>
+                                      ) : isCompleted ? (
+                                        <span className="px-3 py-1 bg-blue-600 text-white rounded-full text-xs font-bold">
+                                          ✓ Hoàn thành
+                                        </span>
+                                      ) : (
+                                        <span className="px-3 py-1 bg-yellow-500 text-white rounded-full text-xs font-bold">
+                                          🔄 Đang thực hiện
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
+                                      <span className="flex items-center gap-1">
+                                        <Clock className="w-4 h-4" />
+                                        {phase.days} ngày
+                                      </span>
+                                      <span className="flex items-center gap-1">
+                                        💰 {new Intl.NumberFormat('vi-VN', {
+                                          style: 'currency',
+                                          currency: 'VND'
+                                        }).format(Number(phase.amount) || 0)}
+                                      </span>
+                                      <span className="flex items-center gap-1">
+                                        📊 {phase.payment_percentage}% thanh toán
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Tasks/Work Description */}
+                                <div className="bg-white border-2 border-indigo-200 rounded-lg p-4">
+                                  <h5 className="font-bold text-gray-900 mb-2 flex items-center gap-2">
+                                    <CheckCircle className="w-4 h-4 text-indigo-600" />
+                                    Công việc cần thực hiện:
+                                  </h5>
+                                  <div className="text-gray-700 whitespace-pre-wrap leading-relaxed">
+                                    {phase.tasks || 'Chưa có mô tả công việc'}
+                                  </div>
+                                </div>
+
+                                {/* Completion Status */}
+                                {phase.completed_at && (
+                                  <div className="mt-3 px-4 py-2 bg-blue-100 border border-blue-300 rounded-lg text-sm">
+                                    <span className="font-semibold text-blue-900">
+                                      ✓ Hoàn thành vào: {new Date(phase.completed_at).toLocaleString('vi-VN')}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Technical Resources */}
                     <div className="bg-white border-2 rounded-xl p-6">
                       <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">

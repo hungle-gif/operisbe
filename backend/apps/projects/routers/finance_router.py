@@ -1,13 +1,14 @@
 """
 Finance & Statistics API
 Revenue tracking, payment statistics, financial reports
+🔒 ADMIN ONLY - All financial data is restricted to administrators
 """
 from typing import List, Dict
 from ninja import Router
 from ninja.errors import HttpError
 from django.db.models import Sum, Count, Q, F
 from django.shortcuts import get_object_or_404
-from api.dependencies.current_user import auth_bearer
+from api.dependencies.current_user import auth_bearer, require_roles
 from apps.projects.models import Project, Proposal, ProjectStatus
 from decimal import Decimal
 from datetime import datetime, timedelta
@@ -16,14 +17,13 @@ router = Router(tags=['Finance & Statistics'])
 
 
 @router.get("/finance/dashboard", auth=auth_bearer)
+@require_roles('admin')
 def get_finance_dashboard(request):
     """
-    Get complete financial dashboard
-    Admin/Sales only
+    🔒 ADMIN ONLY: Get complete financial dashboard
+    Total revenue, deposits, phase payments, statistics
     """
     user = request.auth
-    if user.role not in ['admin', 'sales']:
-        raise HttpError(403, "Admin/Sales only")
 
     # Total statistics
     all_projects = Project.objects.all()
@@ -94,18 +94,26 @@ def get_finance_dashboard(request):
 
 
 @router.get("/finance/projects/{project_id}/details", auth=auth_bearer)
+@require_roles('admin', 'sales', 'customer')
 def get_project_financial_details(request, project_id: str):
     """
     Get detailed financial breakdown for a specific project
     Shows: deposit, phases, total paid, remaining
+    Access: Admin (all), Sales (managed projects), Customer (own projects)
     """
     user = request.auth
     project = get_object_or_404(Project, id=project_id)
 
-    # Check permissions
+    # Role-based access control
     if user.role == 'customer':
+        # Customer can only see their own projects
         if project.customer.user != user:
-            raise HttpError(403, "Not authorized")
+            raise HttpError(403, "You can only view financial details of your own projects")
+    elif user.role in ['sales', 'sale']:
+        # Sales can only see projects they manage
+        if project.project_manager != user:
+            raise HttpError(403, "You can only view financial details of projects you manage")
+    # Admin can see all (already passed through @require_roles)
 
     # Get proposal
     proposal = Proposal.objects.filter(project=project, status='accepted').first()
@@ -179,15 +187,13 @@ def get_project_financial_details(request, project_id: str):
 
 
 @router.get("/finance/revenue-by-period", auth=auth_bearer)
+@require_roles('admin')
 def get_revenue_by_period(request, period: str = 'month'):
     """
-    Get revenue grouped by time period
+    🔒 ADMIN ONLY: Get revenue grouped by time period
     period: 'day', 'week', 'month', 'year'
-    Admin/Sales only
     """
     user = request.auth
-    if user.role not in ['admin', 'sales']:
-        raise HttpError(403, "Admin/Sales only")
 
     # Get completed projects with proposals
     completed_projects = Project.objects.filter(
@@ -235,14 +241,13 @@ def get_revenue_by_period(request, period: str = 'month'):
 
 
 @router.get("/finance/payment-status-summary", auth=auth_bearer)
+@require_roles('admin')
 def get_payment_status_summary(request):
     """
-    Get summary of payment statuses across all projects
-    Admin/Sales only
+    🔒 ADMIN ONLY: Get summary of payment statuses across all projects
+    Deposit stats, phase stats, overall revenue
     """
     user = request.auth
-    if user.role not in ['admin', 'sales']:
-        raise HttpError(403, "Admin/Sales only")
 
     # Get all accepted proposals
     proposals = Proposal.objects.filter(status='accepted')
@@ -311,14 +316,13 @@ def get_payment_status_summary(request):
 
 
 @router.get("/finance/top-customers", auth=auth_bearer)
+@require_roles('admin')
 def get_top_customers_by_revenue(request, limit: int = 10):
     """
-    Get top customers by total revenue
-    Admin/Sales only
+    🔒 ADMIN ONLY: Get top customers by total revenue
+    Sorted by revenue, with project count
     """
     user = request.auth
-    if user.role not in ['admin', 'sales']:
-        raise HttpError(403, "Admin/Sales only")
 
     # Get all completed projects
     completed_projects = Project.objects.filter(
