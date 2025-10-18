@@ -35,6 +35,7 @@ class TransactionOut(BaseModel):
     project_id: str
     project_name: str
     customer_name: str
+    customer_email: str
     transaction_type: str
     status: str
     amount: float
@@ -73,7 +74,7 @@ def serialize_transaction(transaction):
     }
 
 
-@router.get("/transactions", response=List[TransactionOut], auth=auth_bearer)
+@router.get("/transactions", auth=auth_bearer)
 def list_transactions(request, status: str = None, project_id: str = None):
     """
     List all transactions with optional filters
@@ -96,7 +97,7 @@ def list_transactions(request, status: str = None, project_id: str = None):
     return [serialize_transaction(t) for t in transactions]
 
 
-@router.get("/transactions/{transaction_id}", response=TransactionOut, auth=auth_bearer)
+@router.get("/transactions/{transaction_id}", auth=auth_bearer)
 def get_transaction(request, transaction_id: str):
     """Get single transaction details"""
     user = request.auth
@@ -110,7 +111,7 @@ def get_transaction(request, transaction_id: str):
     return serialize_transaction(transaction)
 
 
-@router.post("/transactions/manual", response=TransactionOut, auth=auth_bearer)
+@router.post("/transactions/manual", auth=auth_bearer)
 def create_manual_transaction(request, payload: TransactionCreate):
     """
     Create manual transaction (admin only)
@@ -144,7 +145,7 @@ def create_manual_transaction(request, payload: TransactionCreate):
     return serialize_transaction(transaction)
 
 
-@router.post("/transactions/{transaction_id}/approve", response=TransactionOut, auth=auth_bearer)
+@router.post("/transactions/{transaction_id}/approve", auth=auth_bearer)
 def approve_transaction(request, transaction_id: str):
     """
     Approve pending transaction
@@ -188,7 +189,7 @@ def reject_transaction(request, transaction_id: str, reason: str = None):
     return {"message": "Transaction cancelled", "transaction_id": str(transaction.id)}
 
 
-@router.get("/projects/{project_id}/transactions", response=List[TransactionOut], auth=auth_bearer)
+@router.get("/projects/{project_id}/transactions", auth=auth_bearer)
 def get_project_transactions(request, project_id: str):
     """
     Get all transactions for a specific project

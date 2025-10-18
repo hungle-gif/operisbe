@@ -141,6 +141,11 @@ class ProposalOut(BaseModel):
     payment_submitted_at: Optional[datetime] = Field(None, description="Thời gian submit thanh toán cọc")
     payment_proof: dict = Field(default_factory=dict, description="Chứng từ thanh toán")
 
+    # Full payment option
+    full_payment_option: bool = Field(default=False, description="Khách chọn thanh toán toàn bộ")
+    full_payment_paid: bool = Field(default=False, description="Đã thanh toán toàn bộ")
+    full_payment_paid_at: Optional[datetime] = Field(None, description="Thời gian thanh toán toàn bộ")
+
     total_price: Decimal
     currency: str
 

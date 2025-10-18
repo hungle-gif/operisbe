@@ -762,9 +762,15 @@ export default function ProposalInline({ projectId, userRole }: ProposalInlinePr
             {userRole === 'sale' && (
               <button
                 onClick={() => setEditMode(editMode === 'analysis' ? null : 'analysis')}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
+                disabled={proposal?.status === 'accepted'}
+                className={`px-4 py-2 rounded-lg transition-colors font-medium ${
+                  proposal?.status === 'accepted'
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-blue-500 text-white hover:bg-blue-600'
+                }`}
+                title={proposal?.status === 'accepted' ? '🔒 Không thể sửa - Khách hàng đã chấp nhận' : ''}
               >
-                {editMode === 'analysis' ? '✕ Hủy' : '✏️ Chỉnh sửa'}
+                {proposal?.status === 'accepted' ? '🔒 Đã khóa' : (editMode === 'analysis' ? '✕ Hủy' : '✏️ Chỉnh sửa')}
               </button>
             )}
           </div>
@@ -828,9 +834,15 @@ export default function ProposalInline({ projectId, userRole }: ProposalInlinePr
             {userRole === 'sale' && (
               <button
                 onClick={() => setEditMode(editMode === 'deposit' ? null : 'deposit')}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
+                disabled={proposal?.status === 'accepted'}
+                className={`px-4 py-2 rounded-lg transition-colors font-medium ${
+                  proposal?.status === 'accepted'
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-blue-500 text-white hover:bg-blue-600'
+                }`}
+                title={proposal?.status === 'accepted' ? '🔒 Không thể sửa - Khách hàng đã chấp nhận' : ''}
               >
-                {editMode === 'deposit' ? '✕ Hủy' : '✏️ Chỉnh sửa'}
+                {proposal?.status === 'accepted' ? '🔒 Đã khóa' : (editMode === 'deposit' ? '✕ Hủy' : '✏️ Chỉnh sửa')}
               </button>
             )}
           </div>
@@ -919,15 +931,21 @@ export default function ProposalInline({ projectId, userRole }: ProposalInlinePr
             {userRole === 'sale' && (
               <button
                 onClick={() => setEditMode(editMode === 'phases' ? null : 'phases')}
-                disabled={proposal?.status !== 'draft'}
+                disabled={proposal?.status === 'accepted' || proposal?.status !== 'draft'}
                 className={`px-4 py-2 rounded-lg transition-colors font-medium ${
-                  proposal?.status !== 'draft'
+                  proposal?.status === 'accepted' || proposal?.status !== 'draft'
                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                     : 'bg-blue-500 text-white hover:bg-blue-600'
                 }`}
-                title={proposal?.status !== 'draft' ? '🔒 Không thể sửa giai đoạn sau khi gửi cho khách hàng' : ''}
+                title={
+                  proposal?.status === 'accepted'
+                    ? '🔒 Không thể sửa - Khách hàng đã chấp nhận'
+                    : proposal?.status !== 'draft'
+                    ? '🔒 Không thể sửa giai đoạn sau khi gửi cho khách hàng'
+                    : ''
+                }
               >
-                {editMode === 'phases' ? '✕ Hủy' : proposal?.status !== 'draft' ? '🔒 Đã khóa' : '✏️ Chỉnh sửa'}
+                {editMode === 'phases' ? '✕ Hủy' : (proposal?.status === 'accepted' || proposal?.status !== 'draft') ? '🔒 Đã khóa' : '✏️ Chỉnh sửa'}
               </button>
             )}
           </div>
@@ -1193,9 +1211,15 @@ export default function ProposalInline({ projectId, userRole }: ProposalInlinePr
             {userRole === 'sale' && (
               <button
                 onClick={() => setEditMode(editMode === 'team' ? null : 'team')}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
+                disabled={proposal?.status === 'accepted'}
+                className={`px-4 py-2 rounded-lg transition-colors font-medium ${
+                  proposal?.status === 'accepted'
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-blue-500 text-white hover:bg-blue-600'
+                }`}
+                title={proposal?.status === 'accepted' ? '🔒 Không thể sửa - Khách hàng đã chấp nhận' : ''}
               >
-                {editMode === 'team' ? '✕ Hủy' : '✏️ Chỉnh sửa'}
+                {proposal?.status === 'accepted' ? '🔒 Đã khóa' : (editMode === 'team' ? '✕ Hủy' : '✏️ Chỉnh sửa')}
               </button>
             )}
           </div>
@@ -1318,9 +1342,15 @@ export default function ProposalInline({ projectId, userRole }: ProposalInlinePr
             {userRole === 'sale' && (
               <button
                 onClick={() => setEditMode(editMode === 'commitments' ? null : 'commitments')}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
+                disabled={proposal?.status === 'accepted'}
+                className={`px-4 py-2 rounded-lg transition-colors font-medium ${
+                  proposal?.status === 'accepted'
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-blue-500 text-white hover:bg-blue-600'
+                }`}
+                title={proposal?.status === 'accepted' ? '🔒 Không thể sửa - Khách hàng đã chấp nhận' : ''}
               >
-                {editMode === 'commitments' ? '✕ Hủy' : '✏️ Chỉnh sửa'}
+                {proposal?.status === 'accepted' ? '🔒 Đã khóa' : (editMode === 'commitments' ? '✕ Hủy' : '✏️ Chỉnh sửa')}
               </button>
             )}
           </div>

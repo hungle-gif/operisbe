@@ -277,26 +277,30 @@ export default function ProjectFinancePage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {/* Contract Value */}
           <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl p-6 text-white shadow-lg">
-            <h3 className="text-sm font-medium opacity-90 mb-2">Giá Trị Hợp Đồng</h3>
+            <h3 className="text-sm font-medium opacity-90 mb-2">Tổng Ngân Sách Dự Án</h3>
             <p className="text-3xl font-bold">{formatCurrency(summary.financial_summary.contract_value)}</p>
+            <p className="text-xs opacity-75 mt-2">Giá trị hợp đồng</p>
           </div>
 
           {/* Total Received */}
           <div className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl p-6 text-white shadow-lg">
-            <h3 className="text-sm font-medium opacity-90 mb-2">Đã Thu</h3>
+            <h3 className="text-sm font-medium opacity-90 mb-2">Tổng Tiền Đã Thu</h3>
             <p className="text-3xl font-bold">{formatCurrency(summary.financial_summary.total_received)}</p>
+            <p className="text-xs opacity-75 mt-2">Đã nạp vào dự án</p>
           </div>
 
           {/* Total Refunded */}
           <div className="bg-gradient-to-br from-orange-500 to-red-600 rounded-xl p-6 text-white shadow-lg">
-            <h3 className="text-sm font-medium opacity-90 mb-2">Đã Hoàn</h3>
+            <h3 className="text-sm font-medium opacity-90 mb-2">Tiền Đã Hoàn Trả</h3>
             <p className="text-3xl font-bold">{formatCurrency(summary.financial_summary.total_refunded)}</p>
+            <p className="text-xs opacity-75 mt-2">Hoàn lại khách hàng</p>
           </div>
 
           {/* Pending Amount */}
           <div className="bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl p-6 text-white shadow-lg">
-            <h3 className="text-sm font-medium opacity-90 mb-2">Còn Lại</h3>
+            <h3 className="text-sm font-medium opacity-90 mb-2">Số Tiền Còn Lại</h3>
             <p className="text-3xl font-bold">{formatCurrency(summary.financial_summary.pending_amount)}</p>
+            <p className="text-xs opacity-75 mt-2">Chưa thu đủ</p>
           </div>
         </div>
 
@@ -418,31 +422,43 @@ export default function ProjectFinancePage() {
         {/* Transaction History */}
         <div className="bg-white rounded-xl shadow-lg overflow-hidden">
           <div className="p-6 border-b">
-            <h2 className="text-xl font-bold text-gray-900">Lịch Sử Giao Dịch</h2>
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-bold text-gray-900">Lịch Sử Giao Dịch</h2>
+              <div className="text-sm text-gray-600">
+                <span className="font-semibold text-gray-900">Tổng: {transactions.length}</span> giao dịch
+              </div>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 border-b">
                 <tr>
-                  <th className="text-left py-4 px-4 font-semibold text-gray-600">Loại</th>
+                  <th className="text-left py-4 px-4 font-semibold text-gray-600">Loại GD</th>
                   <th className="text-left py-4 px-4 font-semibold text-gray-600">Giai Đoạn</th>
-                  <th className="text-right py-4 px-4 font-semibold text-gray-600">Số Tiền</th>
+                  <th className="text-right py-4 px-4 font-semibold text-gray-600">Số Tiền Nạp</th>
                   <th className="text-left py-4 px-4 font-semibold text-gray-600">Phương Thức</th>
                   <th className="text-left py-4 px-4 font-semibold text-gray-600">Trạng Thái</th>
-                  <th className="text-left py-4 px-4 font-semibold text-gray-600">Ngày</th>
+                  <th className="text-left py-4 px-4 font-semibold text-gray-600">Thời Gian Nạp</th>
+                  <th className="text-left py-4 px-4 font-semibold text-gray-600">Hoàn Thành</th>
                   <th className="text-left py-4 px-4 font-semibold text-gray-600">Người Xử Lý</th>
                 </tr>
               </thead>
               <tbody>
                 {transactions.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-8 text-gray-500">
-                      Chưa có giao dịch nào
+                    <td colSpan={8} className="text-center py-12">
+                      <div className="flex flex-col items-center">
+                        <svg className="w-16 h-16 text-gray-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <p className="text-gray-500 text-lg font-medium">Chưa có lịch sử giao dịch</p>
+                        <p className="text-gray-400 text-sm mt-1">Giao dịch sẽ được hiển thị tại đây</p>
+                      </div>
                     </td>
                   </tr>
                 ) : (
                   transactions.map((transaction) => (
-                    <tr key={transaction.id} className="border-b hover:bg-gray-50">
+                    <tr key={transaction.id} className="border-b hover:bg-gray-50 transition-colors">
                       <td className="py-4 px-4">
                         <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${getTypeBadge(transaction.transaction_type)}`}>
                           {getTypeLabel(transaction.transaction_type)}
@@ -451,7 +467,7 @@ export default function ProjectFinancePage() {
                       <td className="py-4 px-4">
                         {transaction.phase_index !== null ? (
                           <div>
-                            <div className="font-medium">Giai đoạn {transaction.phase_index + 1}</div>
+                            <div className="font-medium text-gray-900">Giai đoạn {transaction.phase_index + 1}</div>
                             {transaction.phase_name && (
                               <div className="text-sm text-gray-500">{transaction.phase_name}</div>
                             )}
@@ -460,22 +476,72 @@ export default function ProjectFinancePage() {
                           <span className="text-gray-400">-</span>
                         )}
                       </td>
-                      <td className="py-4 px-4 text-right font-bold text-gray-900">
-                        {formatCurrency(transaction.amount)}
+                      <td className="py-4 px-4">
+                        <div className="text-right">
+                          <div className="font-bold text-lg text-gray-900">
+                            {formatCurrency(transaction.amount)}
+                          </div>
+                        </div>
                       </td>
-                      <td className="py-4 px-4 text-sm text-gray-600">
-                        {transaction.payment_method}
+                      <td className="py-4 px-4">
+                        <span className="text-sm text-gray-700 font-medium">
+                          {transaction.payment_method === 'bank_transfer' ? '🏦 Chuyển khoản' :
+                           transaction.payment_method === 'cash' ? '💵 Tiền mặt' :
+                           transaction.payment_method === 'credit_card' ? '💳 Thẻ tín dụng' :
+                           transaction.payment_method}
+                        </span>
                       </td>
                       <td className="py-4 px-4">
                         <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${getStatusBadge(transaction.status)}`}>
                           {getStatusLabel(transaction.status)}
                         </span>
                       </td>
-                      <td className="py-4 px-4 text-sm text-gray-600">
-                        {formatDate(transaction.created_at)}
+                      <td className="py-4 px-4">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {new Date(transaction.created_at).toLocaleDateString('vi-VN', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric'
+                            })}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {new Date(transaction.created_at).toLocaleTimeString('vi-VN', {
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </div>
+                        </div>
                       </td>
-                      <td className="py-4 px-4 text-sm text-gray-600">
-                        {transaction.processed_by ? transaction.processed_by.name : '-'}
+                      <td className="py-4 px-4">
+                        {transaction.completed_at ? (
+                          <div>
+                            <div className="text-sm font-medium text-green-700">
+                              {new Date(transaction.completed_at).toLocaleDateString('vi-VN', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric'
+                              })}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {new Date(transaction.completed_at).toLocaleTimeString('vi-VN', {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400">Chưa hoàn thành</span>
+                        )}
+                      </td>
+                      <td className="py-4 px-4">
+                        {transaction.processed_by ? (
+                          <div className="text-sm">
+                            <span className="font-medium text-gray-900">{transaction.processed_by.name}</span>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-gray-400">-</span>
+                        )}
                       </td>
                     </tr>
                   ))

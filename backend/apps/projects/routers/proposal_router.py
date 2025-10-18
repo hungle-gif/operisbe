@@ -63,6 +63,9 @@ def serialize_proposal(proposal):
         'payment_submitted': proposal.payment_submitted,
         'payment_submitted_at': proposal.payment_submitted_at.isoformat() if proposal.payment_submitted_at else None,
         'payment_proof': proposal.payment_proof if proposal.payment_proof else {},
+        'full_payment_option': proposal.full_payment_option,
+        'full_payment_paid': proposal.full_payment_paid,
+        'full_payment_paid_at': proposal.full_payment_paid_at.isoformat() if proposal.full_payment_paid_at else None,
         'total_price': float(proposal.total_price) if proposal.total_price else 0,
         'currency': proposal.currency,
         'estimated_start_date': proposal.estimated_start_date.isoformat() if proposal.estimated_start_date else None,
@@ -312,10 +315,12 @@ def update_proposal(request, proposal_id: str, payload: ProposalUpdate):
     if user.role not in ['sales', 'admin']:
         raise HttpError(403, "Only sales or customer can update proposals")
 
-    # Sales can update proposals even after sending (for inline editing flow)
-    # But cannot update ACCEPTED or REJECTED proposals
-    if proposal.status in [ProposalStatus.ACCEPTED, ProposalStatus.REJECTED]:
-        raise HttpError(400, "Cannot update accepted or rejected proposal")
+    # 🚫 IMPORTANT: Sales can update proposals even after sending (for inline editing flow)
+    # But CANNOT update ACCEPTED or REJECTED proposals - these are locked
+    if proposal.status == ProposalStatus.ACCEPTED:
+        raise HttpError(400, "🔒 Không thể chỉnh sửa proposal đã được khách hàng chấp nhận. Proposal đã bị khóa.")
+    if proposal.status == ProposalStatus.REJECTED:
+        raise HttpError(400, "🔒 Không thể chỉnh sửa proposal đã bị từ chối.")
 
     # 🚫 IMPORTANT: Cannot add/edit/remove phases after proposal is SENT
     # Once sent to customer, phases are locked to prevent confusion
@@ -594,6 +599,127 @@ def confirm_deposit_payment(request, proposal_id: str):
     proposal.project.save()
 
     # 🎯 AUTO-ASSIGN DEVELOPERS WHEN DEPOSIT IS APPROVED
+    from apps.projects.services.project_service import ProjectService
+    assigned_devs = ProjectService.auto_assign_on_deposit_approval(proposal.project)
+
+    return serialize_proposal(proposal)
+
+
+# ==================== FULL PAYMENT OPTION ====================
+
+
+@router.post("/proposals/{proposal_id}/submit-full-payment", response=ProposalOut, auth=auth_bearer)
+@require_roles('customer', 'no_admin')
+def submit_full_payment(request, proposal_id: str):
+    """
+    🔒 CUSTOMER ONLY: Submit full payment for entire project (deposit + all phases)
+
+    Flow:
+    1. Customer chooses "Thanh toán toàn bộ" option
+    2. Pays: deposit_amount + sum(all phases)
+    3. All phases are marked as paid automatically
+    4. Project starts immediately
+
+    This is an alternative to paying deposit first, then paying each phase separately.
+    """
+    user = request.auth
+    proposal = get_object_or_404(Proposal, id=proposal_id)
+
+    # Must be customer of the project
+    if proposal.project.customer.user != user:
+        raise HttpError(403, "You can only submit payment for your own projects")
+
+    # Proposal must be accepted
+    if proposal.status != ProposalStatus.ACCEPTED:
+        raise HttpError(400, "Proposal must be accepted first")
+
+    # Check if already paid
+    if proposal.full_payment_paid:
+        raise HttpError(400, "Full payment already submitted")
+
+    if proposal.deposit_paid:
+        raise HttpError(400, "Deposit already paid. Cannot switch to full payment option.")
+
+    # Calculate total amount (deposit + all phases)
+    total_amount = Decimal(str(proposal.deposit_amount or 0))
+    for phase in proposal.phases:
+        total_amount += Decimal(str(phase.get('amount', 0)))
+
+    # Mark as full payment
+    now = timezone.now()
+    proposal.full_payment_option = True
+    proposal.full_payment_paid = True
+    proposal.full_payment_paid_at = now
+
+    # Also mark deposit as paid
+    proposal.deposit_paid = True
+    proposal.deposit_paid_at = now
+    proposal.payment_submitted = True
+    proposal.payment_submitted_at = now
+
+    # Mark all phases as paid
+    phases = proposal.phases
+    for idx, phase in enumerate(phases):
+        phase['completed'] = True
+        phase['completed_at'] = now.isoformat()
+        phase['completed_by'] = 'system'  # System auto-complete
+        phase['payment_submitted'] = True
+        phase['payment_submitted_at'] = now.isoformat()
+        phase['payment_approved'] = True
+        phase['payment_approved_at'] = now.isoformat()
+        phase['payment_approved_by'] = str(user.id)
+        phase['payment_proof'] = {
+            'submitted_by': str(user.id),
+            'submitted_at': now.isoformat(),
+            'approved_by': str(user.id),
+            'approved_at': now.isoformat(),
+            'approved_by_name': user.full_name,
+            'amount': str(phase.get('amount', 0)),
+            'phase_name': phase.get('name'),
+            'status': 'approved',
+            'full_payment': True  # Flag to indicate this was from full payment
+        }
+
+    proposal.phases = phases
+    proposal.payment_proof = {
+        'submitted_by': str(user.id),
+        'submitted_at': now.isoformat(),
+        'approved_by': str(user.id),
+        'approved_at': now.isoformat(),
+        'approved_by_name': user.full_name,
+        'total_amount': str(total_amount),
+        'deposit_amount': str(proposal.deposit_amount),
+        'phases_amount': str(total_amount - Decimal(str(proposal.deposit_amount or 0))),
+        'status': 'approved',
+        'payment_type': 'full_payment',
+        'auto_approved': True
+    }
+
+    proposal.save()
+
+    # Create transaction record for full payment
+    record_payment_transaction(
+        project=proposal.project,
+        proposal=proposal,
+        transaction_type=TransactionType.DEPOSIT,  # Use DEPOSIT type for full payment
+        amount=total_amount,
+        description=f"Full payment (deposit + all phases) - Total: {total_amount:,.0f} VND",
+        payment_method='bank_transfer',
+        metadata={
+            'source': 'full_payment_submit',
+            'payment_type': 'full_payment',
+            'deposit_amount': str(proposal.deposit_amount),
+            'phases_count': len(phases),
+            'total_amount': str(total_amount),
+        },
+    )
+
+    # Start the project IMMEDIATELY
+    proposal.project.status = ProjectStatus.IN_PROGRESS
+    proposal.project.start_date = now.date()
+    proposal.project.save()
+
+    # 🎯 AUTO-ASSIGN DEVELOPERS
     from apps.projects.services.project_service import ProjectService
     assigned_devs = ProjectService.auto_assign_on_deposit_approval(proposal.project)
 

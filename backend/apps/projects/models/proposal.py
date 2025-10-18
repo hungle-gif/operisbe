@@ -85,6 +85,21 @@ class Proposal(BaseModel):
         help_text="Admin duyệt cọc"
     )
 
+    # Full Payment Option
+    full_payment_option = models.BooleanField(
+        default=False,
+        help_text="Khách hàng chọn thanh toán toàn bộ (1 lần) thay vì từng giai đoạn"
+    )
+    full_payment_paid = models.BooleanField(
+        default=False,
+        help_text="Đã thanh toán toàn bộ"
+    )
+    full_payment_paid_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Thời gian thanh toán toàn bộ"
+    )
+
     # Customer payment submission (for future SePay integration)
     payment_submitted = models.BooleanField(
         default=False,

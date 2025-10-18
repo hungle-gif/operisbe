@@ -27,16 +27,130 @@ api.interceptors.request.use(
   }
 )
 
-// Response interceptor for error handling
+// Track refresh state
+let isRedirecting = false
+let isRefreshing = false
+let failedQueue: Array<{
+  resolve: (value?: any) => void
+  reject: (reason?: any) => void
+}> = []
+
+const processQueue = (error: any = null) => {
+  failedQueue.forEach(prom => {
+    if (error) {
+      prom.reject(error)
+    } else {
+      prom.resolve()
+    }
+  })
+  failedQueue = []
+}
+
+// Response interceptor with automatic token refresh
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401) {
-      // Handle token refresh or redirect to login
-      localStorage.removeItem('access_token')
-      localStorage.removeItem('refresh_token')
-      window.location.href = '/login'
+    const originalRequest = error.config
+
+    // Handle 401 Unauthorized
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      const refreshToken = localStorage.getItem('refresh_token')
+
+      if (refreshToken && !isRefreshing) {
+        isRefreshing = true
+        originalRequest._retry = true
+
+        try {
+          console.log('🔄 Access token expired. Refreshing...')
+
+          // Call refresh endpoint directly (avoid interceptor loop)
+          const response = await axios.post(`${API_URL}/api/auth/refresh`, {
+            refresh_token: refreshToken
+          })
+
+          const { access_token, refresh_token: new_refresh_token } = response.data
+
+          // Update tokens
+          localStorage.setItem('access_token', access_token)
+          localStorage.setItem('token', access_token)
+          if (new_refresh_token) {
+            localStorage.setItem('refresh_token', new_refresh_token)
+          }
+
+          // Update header
+          api.defaults.headers.common['Authorization'] = `Bearer ${access_token}`
+          originalRequest.headers['Authorization'] = `Bearer ${access_token}`
+
+          console.log('✅ Token refreshed successfully')
+
+          processQueue(null)
+          isRefreshing = false
+
+          // Retry original request
+          return api(originalRequest)
+
+        } catch (refreshError) {
+          console.log('❌ Refresh token failed')
+          processQueue(refreshError)
+          isRefreshing = false
+
+          // Logout
+          if (!isRedirecting) {
+            isRedirecting = true
+            localStorage.removeItem('access_token')
+            localStorage.removeItem('refresh_token')
+            localStorage.removeItem('token')
+            localStorage.removeItem('user')
+
+            console.log('⚠️ Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.')
+
+            const currentPath = window.location.pathname
+            const returnUrl = currentPath !== '/login'
+              ? `?returnUrl=${encodeURIComponent(currentPath)}`
+              : ''
+
+            setTimeout(() => {
+              window.location.href = `/login${returnUrl}`
+            }, 100)
+          }
+
+          return Promise.reject(refreshError)
+        }
+      }
+
+      // Queue request if already refreshing
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject })
+        })
+          .then(() => {
+            originalRequest.headers['Authorization'] = `Bearer ${localStorage.getItem('access_token')}`
+            return api(originalRequest)
+          })
+          .catch(err => Promise.reject(err))
+      }
+
+      // No refresh token → logout
+      if (!refreshToken && !isRedirecting) {
+        isRedirecting = true
+        localStorage.removeItem('access_token')
+        localStorage.removeItem('refresh_token')
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+
+        console.log('⚠️ No refresh token. Please login again.')
+
+        const currentPath = window.location.pathname
+        const returnUrl = currentPath !== '/login'
+          ? `?returnUrl=${encodeURIComponent(currentPath)}`
+          : ''
+
+        setTimeout(() => {
+          window.location.href = `/login${returnUrl}`
+        }, 100)
+      }
     }
+
     return Promise.reject(error)
   }
 )

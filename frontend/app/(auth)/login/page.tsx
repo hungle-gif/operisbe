@@ -1,22 +1,33 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { authAPI } from '@/lib/api'
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [formData, setFormData] = useState({
     email: '',
     password: '',
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [sessionExpiredMessage, setSessionExpiredMessage] = useState('')
+
+  useEffect(() => {
+    // Check if user was redirected due to token expiration
+    const returnUrl = searchParams.get('returnUrl')
+    if (returnUrl) {
+      setSessionExpiredMessage('⚠️ Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.')
+    }
+  }, [searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setSessionExpiredMessage('')
     setLoading(true)
 
     try {
@@ -33,7 +44,16 @@ export default function LoginPage() {
       console.log('User role:', user.role)
       console.log('Token saved to localStorage')
 
-      // Redirect based on user role
+      // Check if there's a return URL
+      const returnUrl = searchParams.get('returnUrl')
+
+      if (returnUrl && returnUrl.startsWith('/dashboard')) {
+        // Redirect back to the page they were on
+        window.location.href = returnUrl
+        return
+      }
+
+      // Otherwise redirect based on user role
       let redirectPath = '/dashboard'
       switch (user.role) {
         case 'admin':
@@ -81,6 +101,12 @@ export default function LoginPage() {
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          {sessionExpiredMessage && (
+            <div className="bg-yellow-50 border border-yellow-400 text-yellow-800 px-4 py-3 rounded relative">
+              <span className="block sm:inline">{sessionExpiredMessage}</span>
+            </div>
+          )}
+
           {error && (
             <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded relative">
               <span className="block sm:inline">{error}</span>

@@ -283,6 +283,38 @@ export default function AdminTransactionsPage() {
           </div>
         </div>
 
+        {/* Summary Stats */}
+        {transactions.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-lg">
+              <h3 className="text-sm font-medium opacity-90 mb-2">Tổng Giao Dịch</h3>
+              <p className="text-3xl font-bold">{transactions.length}</p>
+            </div>
+            <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white shadow-lg">
+              <h3 className="text-sm font-medium opacity-90 mb-2">Tổng Tiền Đã Thu</h3>
+              <p className="text-3xl font-bold">
+                {formatCurrency(
+                  transactions
+                    .filter(t => t.status === 'completed' && ['deposit', 'phase'].includes(t.transaction_type))
+                    .reduce((sum, t) => sum + t.amount, 0)
+                )}
+              </p>
+            </div>
+            <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl p-6 text-white shadow-lg">
+              <h3 className="text-sm font-medium opacity-90 mb-2">Chờ Duyệt</h3>
+              <p className="text-3xl font-bold">
+                {transactions.filter(t => t.status === 'pending').length}
+              </p>
+            </div>
+            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-6 text-white shadow-lg">
+              <h3 className="text-sm font-medium opacity-90 mb-2">Hoàn Thành</h3>
+              <p className="text-3xl font-bold">
+                {transactions.filter(t => t.status === 'completed').length}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Transactions Table */}
         <div className="bg-white rounded-xl shadow-lg overflow-hidden">
           <div className="overflow-x-auto">
@@ -291,27 +323,33 @@ export default function AdminTransactionsPage() {
                 <tr>
                   <th className="text-left py-4 px-4 font-semibold text-gray-600">Dự Án</th>
                   <th className="text-left py-4 px-4 font-semibold text-gray-600">Khách Hàng</th>
-                  <th className="text-left py-4 px-4 font-semibold text-gray-600">Loại</th>
+                  <th className="text-left py-4 px-4 font-semibold text-gray-600">Loại GD</th>
                   <th className="text-left py-4 px-4 font-semibold text-gray-600">Giai Đoạn</th>
-                  <th className="text-right py-4 px-4 font-semibold text-gray-600">Số Tiền</th>
+                  <th className="text-right py-4 px-4 font-semibold text-gray-600">Số Tiền Nạp</th>
                   <th className="text-left py-4 px-4 font-semibold text-gray-600">Trạng Thái</th>
-                  <th className="text-left py-4 px-4 font-semibold text-gray-600">Ngày Tạo</th>
+                  <th className="text-left py-4 px-4 font-semibold text-gray-600">Thời Gian Nạp</th>
                   <th className="text-center py-4 px-4 font-semibold text-gray-600">Thao Tác</th>
                 </tr>
               </thead>
               <tbody>
                 {transactions.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="text-center py-8 text-gray-500">
-                      Không có giao dịch nào
+                    <td colSpan={8} className="text-center py-12">
+                      <div className="flex flex-col items-center">
+                        <svg className="w-16 h-16 text-gray-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <p className="text-gray-500 text-lg font-medium">Chưa có lịch sử giao dịch</p>
+                        <p className="text-gray-400 text-sm mt-1">Tạo giao dịch thủ công hoặc chờ khách hàng thanh toán</p>
+                      </div>
                     </td>
                   </tr>
                 ) : (
                   transactions.map((transaction) => (
-                    <tr key={transaction.id} className="border-b hover:bg-gray-50">
+                    <tr key={transaction.id} className="border-b hover:bg-gray-50 transition-colors">
                       <td className="py-4 px-4">
                         <button
-                          onClick={() => router.push(`/dashboard/admin/projects/${transaction.project_id}`)}
+                          onClick={() => router.push(`/dashboard/admin/projects/${transaction.project_id}/finance`)}
                           className="text-blue-600 hover:underline font-medium"
                         >
                           {transaction.project_name}
@@ -331,7 +369,7 @@ export default function AdminTransactionsPage() {
                       <td className="py-4 px-4">
                         {transaction.phase_index !== null ? (
                           <div>
-                            <div className="font-medium">Giai đoạn {transaction.phase_index + 1}</div>
+                            <div className="font-medium text-gray-900">Giai đoạn {transaction.phase_index + 1}</div>
                             {transaction.phase_name && (
                               <div className="text-sm text-gray-500">{transaction.phase_name}</div>
                             )}
@@ -340,16 +378,34 @@ export default function AdminTransactionsPage() {
                           <span className="text-gray-400">-</span>
                         )}
                       </td>
-                      <td className="py-4 px-4 text-right font-bold text-gray-900">
-                        {formatCurrency(transaction.amount)}
+                      <td className="py-4 px-4">
+                        <div className="text-right">
+                          <div className="font-bold text-lg text-gray-900">
+                            {formatCurrency(transaction.amount)}
+                          </div>
+                        </div>
                       </td>
                       <td className="py-4 px-4">
                         <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${getStatusBadge(transaction.status)}`}>
                           {getStatusLabel(transaction.status)}
                         </span>
                       </td>
-                      <td className="py-4 px-4 text-sm text-gray-600">
-                        {formatDate(transaction.created_at)}
+                      <td className="py-4 px-4">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {new Date(transaction.created_at).toLocaleDateString('vi-VN', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric'
+                            })}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {new Date(transaction.created_at).toLocaleTimeString('vi-VN', {
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </div>
+                        </div>
                       </td>
                       <td className="py-4 px-4">
                         <div className="flex items-center justify-center gap-2">
