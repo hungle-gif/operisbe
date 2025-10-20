@@ -3,9 +3,15 @@ from .project_schema import (
     ChatMessageOut, ChatMessageCreate,
     UserInfo, CustomerInfo
 )
+from .project_template_schema import (
+    ProjectTemplateOut, ProjectTemplateListOut,
+    ProjectTemplateCreate, ProjectTemplateUpdate
+)
 
 __all__ = [
     'ProjectOut', 'ProjectListOut',
     'ChatMessageOut', 'ChatMessageCreate',
-    'UserInfo', 'CustomerInfo'
+    'UserInfo', 'CustomerInfo',
+    'ProjectTemplateOut', 'ProjectTemplateListOut',
+    'ProjectTemplateCreate', 'ProjectTemplateUpdate'
 ]

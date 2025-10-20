@@ -17,7 +17,8 @@ import {
   BarChart3,
   Package,
   MessageSquare,
-  ChevronDown
+  ChevronDown,
+  Layers
 } from 'lucide-react'
 
 interface DashboardHeaderProps {
@@ -70,6 +71,7 @@ export default function DashboardHeader({ user }: DashboardHeaderProps) {
     { icon: Home, label: 'Tổng quan', href: '/dashboard/admin' },
     { icon: Users, label: 'Người dùng', href: '/dashboard/admin/users' },
     { icon: FolderKanban, label: 'Dự án', href: '/dashboard/admin/projects' },
+    { icon: Layers, label: 'Dự án Mẫu', href: '/dashboard/admin/project-templates' },
     { icon: Package, label: 'Dịch vụ', href: '/dashboard/admin/services' },
     { icon: DollarSign, label: 'Tài chính', href: '/dashboard/admin/finance' },
     { icon: BarChart3, label: 'Báo cáo', href: '/dashboard/admin/reports' },
