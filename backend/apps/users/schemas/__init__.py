@@ -9,6 +9,30 @@ from .user_schema import (
     UserListQuery
 )
 
+from .password_reset_schema import (
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
+    VerifyResetTokenRequest,
+    VerifyResetTokenResponse,
+    ResetPasswordRequest,
+    ResetPasswordResponse,
+    ChangePasswordRequest,
+    ChangePasswordResponse
+)
+
+from .google_oauth_schema import (
+    GoogleOAuthInitRequest,
+    GoogleOAuthInitResponse,
+    GoogleOAuthCallbackRequest,
+    GoogleOAuthCallbackResponse,
+    GoogleUserInfo,
+    LinkGoogleAccountRequest,
+    LinkGoogleAccountResponse,
+    UnlinkSocialAccountRequest,
+    UnlinkSocialAccountResponse,
+    SocialAccountInfo
+)
+
 __all__ = [
     'UserCreate',
     'UserUpdate',
@@ -17,5 +41,23 @@ __all__ = [
     'LoginSchema',
     'TokenResponse',
     'RefreshTokenSchema',
-    'UserListQuery'
+    'UserListQuery',
+    'ForgotPasswordRequest',
+    'ForgotPasswordResponse',
+    'VerifyResetTokenRequest',
+    'VerifyResetTokenResponse',
+    'ResetPasswordRequest',
+    'ResetPasswordResponse',
+    'ChangePasswordRequest',
+    'ChangePasswordResponse',
+    'GoogleOAuthInitRequest',
+    'GoogleOAuthInitResponse',
+    'GoogleOAuthCallbackRequest',
+    'GoogleOAuthCallbackResponse',
+    'GoogleUserInfo',
+    'LinkGoogleAccountRequest',
+    'LinkGoogleAccountResponse',
+    'UnlinkSocialAccountRequest',
+    'UnlinkSocialAccountResponse',
+    'SocialAccountInfo'
 ]

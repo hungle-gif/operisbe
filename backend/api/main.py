@@ -5,6 +5,8 @@ from ninja import NinjaAPI
 from .exceptions.handlers import register_exception_handlers
 from apps.users.routers.auth_router import router as auth_router
 from apps.users.routers.user_router import router as user_router
+from apps.users.routers.password_reset_router import router as password_reset_router
+from apps.users.routers.google_oauth_router import router as google_oauth_router
 from apps.services.routers.service_router import router as service_router
 from apps.projects.routers import project_router
 from apps.projects.routers.project_template_router import router as project_template_router
@@ -25,6 +27,8 @@ register_exception_handlers(api)
 
 # Register routers
 api.add_router("/auth", auth_router)
+api.add_router("/auth/google", google_oauth_router)
+api.add_router("/password-reset", password_reset_router)
 api.add_router("/users", user_router)
 api.add_router("/services", service_router)
 api.add_router("/projects", project_router)
